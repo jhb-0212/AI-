@@ -23,7 +23,7 @@ def _site_out(db: Session) -> SiteOut:
     doing = db.scalars(select(Doing).order_by(Doing.sort, Doing.id)).all()
     payload = {
         k: base.get(k, "")
-        for k in ("name", "en", "mark", "intro", "lead", "desc", "playlistId", "musicApi", "portfolioUrl", "backgroundImage")
+        for k in ("name", "en", "mark", "intro", "lead", "desc", "playlistId", "musicApi", "musicServer", "portfolioUrl", "backgroundImage")
     }
     payload["backgroundImageDim"] = base.get("backgroundImageDim", 0.0)
     payload["contact"] = base.get("contact", {})

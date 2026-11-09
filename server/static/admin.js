@@ -1112,14 +1112,14 @@ async function viewMusic(el) {
   el.innerHTML = `
     <div class="panel" style="margin-bottom:16px">
       <div class="panel-head"><span>曲目 · ${tracks.length} 首</span><button class="btn sm primary" id="new-track">加一首</button></div>
-      <table><thead><tr><th>曲名</th><th>网易云 ID</th><th>时长</th><th>那句理由</th><th></th></tr></thead><tbody>
+      <table><thead><tr><th>曲名</th><th>歌曲 ID</th><th>时长</th><th>那句理由</th><th></th></tr></thead><tbody>
         ${
           tracks.length
             ? tracks
                 .map(
                   (t) => `<tr>
           <td><span class="t">${esc(t.name)}</span><span class="m">${esc(t.artist)}</span></td>
-          <td><a href="https://music.163.com/#/song?id=${t.netease_id}" target="_blank" rel="noopener">${t.netease_id}</a></td>
+          <td><span class="m">${esc(t.song_id)}</span></td>
           <td>${Math.floor(t.dur / 60)}:${String(t.dur % 60).padStart(2, '0')}</td>
           <td><span class="m">${esc(t.why)}</span></td>
           <td><div class="row-actions">
@@ -1169,7 +1169,7 @@ async function viewMusic(el) {
 
 async function trackEditor(id) {
   const tracks = await api('/site/tracks');
-  const t = id ? tracks.find((x) => x.id === id) : { netease_id: '', name: '', artist: '', dur: 0, why: '', sort: tracks.length };
+  const t = id ? tracks.find((x) => x.id === id) : { song_id: '', name: '', artist: '', dur: 0, why: '', sort: tracks.length };
   $('#view-title').textContent = id ? '编辑曲目' : '加一首';
   $('#view').innerHTML = `
     <div class="editor">
@@ -1179,7 +1179,7 @@ async function trackEditor(id) {
           <label class="field"><span>歌手</span><input type="text" id="f-artist" value="${esc(t.artist)}" /></label>
         </div>
         <div class="split">
-          <label class="field"><span>网易云 ID（song?id= 后面那串）</span><input type="number" id="f-id" value="${t.netease_id}" /></label>
+          <label class="field"><span>歌曲 ID（QQ 音乐 songmid / 网易云数字 id）</span><input type="text" id="f-id" value="${esc(t.song_id)}" /></label>
           <label class="field"><span>整首时长（秒）</span><input type="number" id="f-dur" value="${t.dur}" /></label>
         </div>
         <label class="field"><span>为什么放这首（一句话）</span><input type="text" id="f-why" value="${esc(t.why)}" /></label>
@@ -1199,14 +1199,14 @@ async function trackEditor(id) {
   });
   $('#save').addEventListener('click', async () => {
     const payload = {
-      netease_id: Number($('#f-id').value),
+      song_id: $('#f-id').value.trim(),
       name: $('#f-name').value.trim(),
       artist: $('#f-artist').value.trim(),
       dur: Number($('#f-dur').value) || 0,
       why: $('#f-why').value.trim(),
       sort: t.sort ?? 0,
     };
-    if (!payload.name || !payload.netease_id) return toast('曲名和网易云 ID 必填', true);
+    if (!payload.name || !payload.song_id) return toast('曲名和歌曲 ID 必填', true);
     try {
       if (id) await api('/site/tracks/' + id, { method: 'PUT', body: payload });
       else await api('/site/tracks', { method: 'POST', body: payload });
@@ -1311,6 +1311,7 @@ async function viewSite(el) {
     desc: $('#s-desc').value.trim(),
     playlistId: site.playlistId,
     musicApi: site.musicApi,
+    musicServer: site.musicServer,
     portfolioUrl: $('#s-portfolio').value.trim(),
     backgroundImage: $('#s-bgimg').value.trim(),
     backgroundImageDim: Number($('#s-bgdim').value) / 100,

@@ -169,7 +169,7 @@ class PhotoPatch(BaseModel):
 
 
 class TrackIn(BaseModel):
-    netease_id: int
+    song_id: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=160)
     artist: str = ""
     dur: int = 0
@@ -179,7 +179,7 @@ class TrackIn(BaseModel):
 
 class TrackOut(ORM):
     id: int
-    netease_id: int
+    song_id: str
     name: str
     artist: str
     dur: int
@@ -221,6 +221,7 @@ class SiteIn(BaseModel):
     desc: str = ""
     playlistId: str = ""
     musicApi: str = ""
+    musicServer: str = ""
     portfolioUrl: str = ""
     backgroundImage: str = ""
     backgroundImageDim: float = 0.0
@@ -238,6 +239,7 @@ class SiteOut(BaseModel):
     desc: str = ""
     playlistId: str = ""
     musicApi: str = ""
+    musicServer: str = ""
     portfolioUrl: str = ""
     backgroundImage: str = ""
     backgroundImageDim: float = 0.0

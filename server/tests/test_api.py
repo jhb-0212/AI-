@@ -110,7 +110,7 @@ def test_album_and_track_flow(admin):
     created = next(a for a in albums if a["slug"] == "test-album")
     assert admin.delete(f"/api/albums/{created['id']}").status_code == 204
 
-    track = {"netease_id": 64638, "name": "测试曲目", "artist": "x", "dur": 100, "why": "", "sort": 99}
+    track = {"song_id": "64638", "name": "测试曲目", "artist": "x", "dur": 100, "why": "", "sort": 99}
     assert admin.post("/api/site/tracks", json=track).status_code == 201
     tracks = admin.get("/api/site/tracks").json()
     tid = next(t["id"] for t in tracks if t["name"] == "测试曲目")

@@ -109,17 +109,18 @@ def test_stale_files_removed_but_manual_kept(sandbox):
 def test_site_json_shape(sandbox):
     db = sandbox
     db.add(Setting(key="site", value={"name": "忘忧居", "en": "Nepenthe", "contact": {"github": ""}}))
-    db.add(Track(netease_id=64638, name="陀飞轮", artist="陈奕迅", dur=278, why="理由", sort=1))
+    db.add(Track(song_id="64638", name="陀飞轮", artist="陈奕迅", dur=278, why="理由", sort=1))
     db.commit()
     render.render_all(db)
 
     import json
 
     payload = json.loads((render.ROOT_DIR / "src/data/site.data.json").read_text(encoding="utf-8"))
-    assert payload["tracks"][0] == {"id": 64638, "name": "陀飞轮", "artist": "陈奕迅", "dur": 278, "why": "理由"}
+    assert payload["tracks"][0] == {"id": "64638", "name": "陀飞轮", "artist": "陈奕迅", "dur": 278, "why": "理由"}
     assert set(payload) == {
         "name", "en", "mark", "intro", "lead", "desc", "playlistId", "musicApi",
-        "portfolioUrl", "contact", "bio", "tracks", "doing", "facts",
+        "musicServer", "portfolioUrl", "backgroundImage", "backgroundImageDim",
+        "contact", "bio", "tracks", "doing", "facts",
     }
 
 

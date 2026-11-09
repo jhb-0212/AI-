@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -113,7 +113,9 @@ class Track(Base):
     __tablename__ = "tracks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    netease_id: Mapped[int] = mapped_column(Integer)
+    # 歌曲唯一标识：QQ 音乐的 songmid 是字符串（如 001if23h0TDFmD），
+    # 网易云的 id 是纯数字，统一按字符串存，两种源都兼容。
+    song_id: Mapped[str] = mapped_column(String(64))
     name: Mapped[str] = mapped_column(String(160))
     artist: Mapped[str] = mapped_column(String(160), default="")
     dur: Mapped[int] = mapped_column(Integer, default=0)
@@ -161,6 +163,20 @@ class Visit(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
+class LoginFailure(Base):
+    """登录失败记录：登录限流用，落库保证多进程/重启后依然生效。
+
+    每个 IP 一条，failures 是该 IP 在窗口内的失败时间戳列表（JSON），
+    lock_until 是锁定到期时间（秒级时间戳）。成功登录后清空。
+    """
+
+    __tablename__ = "login_failures"
+
+    ip: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failures: Mapped[list] = mapped_column(JSON, default=list)  # 失败时间戳（float 秒）
+    lock_until: Mapped[float] = mapped_column(Float, default=0.0)
+
+
 class ContentVersion(Base):
     """内容历史版本：每次修改文章/随记/小说/章节前，自动保存旧版本快照。"""
 
@@ -181,6 +197,7 @@ __all__ = [
     "Chapter",
     "ContentVersion",
     "Doing",
+    "LoginFailure",
     "Note",
     "Novel",
     "Photo",

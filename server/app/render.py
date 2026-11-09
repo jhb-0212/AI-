@@ -113,13 +113,14 @@ def _site_payload(db: Session) -> dict:
         "desc": base.get("desc", ""),
         "playlistId": base.get("playlistId", ""),
         "musicApi": base.get("musicApi", ""),
+        "musicServer": base.get("musicServer", ""),
         "portfolioUrl": base.get("portfolioUrl", ""),
         "backgroundImage": base.get("backgroundImage", ""),
         "backgroundImageDim": base.get("backgroundImageDim", 0.0),
         "contact": base.get("contact", {}),
         "bio": base.get("bio", []),
         "tracks": [
-            {"id": t.netease_id, "name": t.name, "artist": t.artist, "dur": t.dur, "why": t.why}
+            {"id": t.song_id, "name": t.name, "artist": t.artist, "dur": t.dur, "why": t.why}
             for t in tracks
         ],
         "doing": [

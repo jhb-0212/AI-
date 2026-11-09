@@ -158,6 +158,7 @@ def seed_if_empty(db: Session) -> dict:
                             "desc",
                             "playlistId",
                             "musicApi",
+                            "musicServer",
                             "portfolioUrl",
                         )
                     }
@@ -172,7 +173,7 @@ def seed_if_empty(db: Session) -> dict:
             for i, track in enumerate(payload.get("tracks", [])):
                 db.add(
                     Track(
-                        netease_id=int(track["id"]),
+                        song_id=str(track["id"]),
                         name=track["name"],
                         artist=track.get("artist", ""),
                         dur=int(track.get("dur", 0)),
