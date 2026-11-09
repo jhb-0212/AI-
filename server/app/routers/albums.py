@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..config import GALLERY_DIR
 from ..db import get_db
+from ..imaging import sanitize_image
 from ..models import Album, Photo
 from ..render import delete_gallery_file
 from ..schemas import AlbumIn, AlbumOut, PhotoOut, PhotoPatch
@@ -146,6 +147,12 @@ async def upload_photo(
         suffix = ".jpg"
     elif real_type != ".jpg" and real_type != suffix:
         suffix = real_type
+
+    # 重编码 + 剥离 EXIF（防 GPS 泄露、防 polyglot 文件）
+    try:
+        raw = sanitize_image(raw, suffix)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
 
     try:
         photo_date = date_cls.today() if not date else date_cls.fromisoformat(date)
