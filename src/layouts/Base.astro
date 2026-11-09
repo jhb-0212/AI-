@@ -1,0 +1,390 @@
+---
+import '../styles/global.css';
+import '../styles/extra.css';
+import Nav from '../components/Nav.astro';
+import { site } from '../data/site';
+import { link } from '../utils/url';
+import { ViewTransitions } from 'astro:transitions';
+
+const { title, desc = site.desc, type = 'website' } = Astro.props;
+const fullTitle = title ? `${title} · ${site.name} ${site.en}` : `${site.name} · ${site.en}`;
+const year = new Date().getFullYear();
+
+// 访客统计：只有配了 PUBLIC_VISIT_ENDPOINT 才开启。
+// 这样本地 build / preview 不会往 127.0.0.1 打空请求，部署时在 .env 里填一行就生效。
+const visitEndpoint = import.meta.env.PUBLIC_VISIT_ENDPOINT || '';
+const visitOn = Boolean(visitEndpoint);
+
+// 背景图：后台「站点」页配，留空则用默认的黄昏天色渐变。
+const bgImage = site.backgroundImage || '';
+const bgDim = typeof site.backgroundImageDim === 'number' ? site.backgroundImageDim : 0;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={desc} />
+    <meta name="theme-color" content="#07050C" />
+    <link rel="icon" href={link('/favicon.svg')} type="image/svg+xml" />
+    <link rel="canonical" href={Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined} />
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:url" content={Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined} />
+    <meta property="og:image" content={Astro.site ? new URL(link('/og-image.svg'), Astro.site).href : undefined} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={desc} />
+    <meta name="twitter:image" content={Astro.site ? new URL(link('/og-image.svg'), Astro.site).href : undefined} />
+    <link rel="preconnect" href="https://miaoda.feishu.cn" />
+    <link rel="preconnect" href="https://sf3-scmcdn-cn.feishucdn.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@900&family=Noto+Sans+SC:wght@400&family=Noto+Sans+SC:wght@700&display=swap"
+    />
+    <script is:inline>document.documentElement.classList.add('js');</script>
+    <slot name="head" />
+    <ViewTransitions />
+  </head>
+  <body class={bgImage ? 'has-bgimg' : undefined} style={bgImage ? `--bgimg: url("${bgImage}"); --bgdim: ${bgDim}` : undefined}>
+    <Nav />
+    <main id="app">
+      <slot />
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot-in">
+        <div>
+          <span class="foot-name">{site.name}</span><span class="foot-en">{site.en}</span>
+        </div>
+        <div class="foot-meta">© {year} · 手工搭建 · <a href={link('/rss.xml')}>RSS</a></div>
+      </div>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script is:inline define:vars={{ visitEndpoint, visitOn }}>
+      window.__VISIT = { endpoint: visitEndpoint, on: visitOn };
+    </script>
+    <script>
+      import '../scripts/visit.js';
+    </script>
+
+    <script>
+      const toastEl = document.getElementById('toast');
+      let toastTimer = 0;
+      function toast(msg) {
+        if (!toastEl) return;
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove('show'), 4600);
+      }
+
+      document.addEventListener('click', (e) => {
+        const target = e.target instanceof Element ? e.target : null;
+        if (!target) return;
+
+        const ext = target.closest('[data-ext="portfolio"]');
+        if (ext) {
+          const href = ext.getAttribute('href') || '#';
+          if (!/^https?:/.test(href)) {
+            e.preventDefault();
+            toast('作品集链接还没填：在后台「站点」页填 portfolioUrl。');
+            return;
+          }
+        }
+
+        const copyBtn = target.closest('[data-copy]');
+        if (copyBtn) {
+          e.preventDefault();
+          const v = copyBtn.getAttribute('data-copy') || '';
+          if (v && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(v).then(
+              () => toast('已复制：' + v),
+              () => toast('复制不了，手动选一下：' + v)
+            );
+          } else {
+            toast('手动选一下：' + v);
+          }
+          return;
+        }
+
+        const todo = target.closest('[data-todo]');
+        if (todo) {
+          e.preventDefault();
+          toast(todo.getAttribute('data-todo') || '');
+          return;
+        }
+
+        const jump = target.closest('[data-scroll]');
+        if (jump) {
+          e.preventDefault();
+          const id = jump.getAttribute('data-scroll');
+          const box = id ? document.getElementById(id) : null;
+          if (box) {
+            box.scrollIntoView({
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+              block: 'start',
+            });
+          }
+        }
+      });
+
+      // 首页按 / 直接进搜索。
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== '/') return;
+        const t = e.target;
+        if (t instanceof Element && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        const entry = document.querySelector('[data-search-entry]');
+        if (!entry) return;
+        e.preventDefault();
+        const href = entry.getAttribute('href');
+        if (href) location.href = href;
+      });
+
+      // 窄屏菜单：默认收起，点按钮展开，选中或按 Esc 收起。
+      const navToggle = document.querySelector('.nav-toggle');
+      const navMenu = document.getElementById('site-menu');
+      if (navToggle && navMenu) {
+        const setOpen = (open) => {
+          navMenu.classList.toggle('open', open);
+          navToggle.setAttribute('aria-expanded', String(open));
+        };
+        navToggle.addEventListener('click', () => setOpen(!navMenu.classList.contains('open')));
+        navMenu.addEventListener('click', (e) => {
+          const a = e.target instanceof Element ? e.target.closest('a') : null;
+          if (a) setOpen(false);
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') setOpen(false);
+        });
+        window.addEventListener('resize', () => {
+          if (window.innerWidth > 1080) setOpen(false);
+        });
+      }
+
+      // 导航栏：首屏透明叠在山景上，下滑后固定在顶部
+      const nav = document.querySelector('.nav');
+      if (nav) {
+        const hasHero = document.querySelector('.hero-full');
+        const onScroll = () => {
+          if (!hasHero || window.scrollY > 40) {
+            nav.classList.add('is-fixed');
+          } else {
+            nav.classList.remove('is-fixed');
+          }
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+      }
+
+      // 滚动入场：只做一次，离屏后不再观察。
+      const items = Array.prototype.slice.call(document.querySelectorAll('.rise'));
+      if (items.length) {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!('IntersectionObserver' in window) || reduced) {
+          items.forEach((el) => el.classList.add('in'));
+        } else {
+          const io = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((en) => {
+                if (en.isIntersecting) {
+                  en.target.classList.add('in');
+                  io.unobserve(en.target);
+                }
+              });
+            },
+            { rootMargin: '0px 0px -12% 0px', threshold: 0.08 }
+          );
+          items.forEach((el) => io.observe(el));
+        }
+      }
+
+      // ---- 设置面板：打开/关闭逻辑 ----
+      const setBtn = document.querySelector('.set-btn');
+      const setPanel = document.getElementById('sets');
+      const closeSets = () => {
+        if (!setPanel) return;
+        setPanel.classList.remove('open');
+        setPanel.setAttribute('aria-hidden', 'true');
+        if (setBtn) setBtn.setAttribute('aria-expanded', 'false');
+      };
+
+      if (setBtn && setPanel) {
+        setBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const open = !setPanel.classList.contains('open');
+          setPanel.classList.toggle('open', open);
+          setPanel.setAttribute('aria-hidden', String(!open));
+          setBtn.setAttribute('aria-expanded', String(open));
+        });
+        setPanel.addEventListener('click', (e) => {
+          const t = e.target instanceof Element ? e.target : null;
+          if (t && t.closest('.sets-close')) closeSets();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') closeSets();
+        });
+        document.addEventListener('pointerdown', (e) => {
+          if (!setPanel.classList.contains('open')) return;
+          const t = e.target instanceof Element ? e.target : null;
+          if (t && (setPanel.contains(t) || setBtn.contains(t))) return;
+          closeSets();
+        });
+      }
+
+      // 自动生成文章左侧目录（TOC）
+      (function () {
+        const body = document.querySelector('.art-body');
+        if (!body) return;
+        const heads = body.querySelectorAll('h2, h3');
+        if (heads.length < 2) return; // 少于2个标题不显示目录
+
+        // 给每个标题加 id
+        heads.forEach((h, i) => {
+          if (!h.id) h.id = 'sec-' + i;
+        });
+
+        // 创建目录
+        const toc = document.createElement('aside');
+        toc.className = 'toc';
+        toc.innerHTML = '<div class="toc-title">目录</div>';
+        const list = document.createElement('ul');
+
+        heads.forEach((h, i) => {
+          const li = document.createElement('li');
+          li.className = 'toc-item ' + h.tagName.toLowerCase();
+          const a = document.createElement('a');
+          a.href = '#' + h.id;
+          a.textContent = h.textContent;
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            history.replaceState(null, '', '#' + h.id);
+          });
+          li.appendChild(a);
+          list.appendChild(li);
+        });
+        toc.appendChild(list);
+
+        // 插入到 .art-body 前面，包在 article 里
+        const article = body.closest('article');
+        if (article) {
+          article.classList.add('has-toc');
+          article.querySelector('.wrap')?.insertBefore(toc, body);
+        }
+
+        // 滚动高亮当前章节
+        const tocItems = toc.querySelectorAll('.toc-item a');
+        const onScroll = () => {
+          let current = 0;
+          heads.forEach((h, i) => {
+            if (h.getBoundingClientRect().top < 120) current = i;
+          });
+          tocItems.forEach((a, i) => a.parentElement?.classList.toggle('active', i === current));
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+      })();
+
+      // ---- 背景微粒动画 ----
+      (function () {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduced) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'bg-particles';
+        canvas.style.cssText = 'position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.4;';
+        document.body.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        let w, h;
+        let particles = [];
+
+        function resize() {
+          w = canvas.width = window.innerWidth;
+          h = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        const count = Math.min(60, Math.floor(w / 25));
+        for (let i = 0; i < count; i++) {
+          particles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            r: 1 + Math.random() * 2,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: (Math.random() - 0.5) * 0.3,
+            alpha: 0.2 + Math.random() * 0.4,
+          });
+        }
+
+        function tick() {
+          ctx.clearRect(0, 0, w, h);
+          particles.forEach((p) => {
+            p.x += p.vx;
+            p.y += p.vy;
+            if (p.x < 0) p.x = w;
+            if (p.x > w) p.x = 0;
+            if (p.y < 0) p.y = h;
+            if (p.y > h) p.y = 0;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(90, 138, 122, ${p.alpha})`;
+            ctx.fill();
+          });
+          requestAnimationFrame(tick);
+        }
+        tick();
+      })();
+
+      // ---- 鼠标跟随光晕 ----
+      (function () {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduced) return;
+
+        const glow = document.createElement('div');
+        glow.id = 'cursor-glow';
+        glow.style.cssText = `
+          position: fixed;
+          width: 300px;
+          height: 300px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(90, 138, 122, 0.08) 0%, transparent 70%);
+          pointer-events: none;
+          z-index: 1;
+          transform: translate(-50%, -50%);
+          transition: opacity 0.3s;
+          opacity: 0;
+        `;
+        document.body.appendChild(glow);
+
+        let mouseX = 0, mouseY = 0;
+        let glowX = 0, glowY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+          mouseX = e.clientX;
+          mouseY = e.clientY;
+          glow.style.opacity = '1';
+        });
+
+        function animate() {
+          glowX += (mouseX - glowX) * 0.08;
+          glowY += (mouseY - glowY) * 0.08;
+          glow.style.left = glowX + 'px';
+          glow.style.top = glowY + 'px';
+          requestAnimationFrame(animate);
+        }
+        animate();
+      })();
+    </script>
+  </body>
+</html>

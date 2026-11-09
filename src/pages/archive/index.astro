@@ -1,0 +1,255 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { link } from '../../utils/url';
+
+const posts = await getCollection('posts', ({ data }) => !data.draft);
+const notes = await getCollection('notes', ({ data }) => !data.draft);
+const chapters = await getCollection('chapters', ({ data }) => !data.draft);
+const novels = await getCollection('novels');
+
+type Kind = 'post' | 'note' | 'chapter';
+type Item = { date: Date; title: string; sub: string; href: string; kind: Kind; label: string };
+
+const items: Item[] = [];
+
+for (const p of posts) {
+  items.push({
+    date: p.data.date,
+    title: p.data.title,
+    sub: p.data.summary,
+    href: link(`/writing/${p.id}/`),
+    kind: 'post',
+    label: '文章',
+  });
+}
+for (const n of notes) {
+  const body = (n.body || '').trim().split('\n')[0];
+  items.push({
+    date: n.data.date,
+    title: body.length > 44 ? `${body.slice(0, 44)}…` : body || '随记',
+    sub: '',
+    href: link(`/notes/#note-${n.id}`),
+    kind: 'note',
+    label: '随记',
+  });
+}
+for (const c of chapters) {
+  const [workId, chapId] = c.id.split('/');
+  const w = novels.find((x) => x.id === workId);
+  items.push({
+    date: c.data.date,
+    title: c.data.title,
+    sub: w ? `《${w.data.title}》第 ${c.data.order} 章` : '小说章节',
+    href: link(`/novels/${workId}/${chapId}/`),
+    kind: 'chapter',
+    label: '小说',
+  });
+}
+
+items.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+/* 这条河的几何：一行一条，横坐标在两列卡片之间来回摆，纵坐标等距往下。
+   卡片数一变，河就跟着重新长一次形状，不用手画路径。 */
+const STEP = 152;
+const AMP = 14; // 摆幅，占容器宽度的百分比
+const MID = 50;
+// 河面上那道流过的亮光有多高（纵向是 1:1 的像素，横向被 viewBox 拉满，所以只写纵向）
+const BAND = 230;
+// 细碎波光那条窄带的高度
+const RIPPLE = 54;
+
+const height = items.length * STEP;
+const points = items.map((_, i) => ({
+  x: MID + (i % 2 === 0 ? -AMP : AMP),
+  y: i * STEP + STEP / 2,
+}));
+
+let path = '';
+if (points.length) {
+  const first = points[0];
+  path = `M ${first.x} 0 L ${first.x} ${first.y}`;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    const my = (a.y + b.y) / 2;
+    path += ` C ${a.x} ${my} ${b.x} ${my} ${b.x} ${b.y}`;
+  }
+  path += ` L ${points[points.length - 1].x} ${height}`;
+}
+
+const pad = (n) => String(n).padStart(2, '0');
+const day = (d: Date) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+const oldest = items.length ? items[items.length - 1].date : null;
+const newest = items.length ? items[0].date : null;
+const span = oldest
+  ? `${oldest.getFullYear()}.${pad(oldest.getMonth() + 1)} – ${newest ? `${newest.getFullYear()}.${pad(newest.getMonth() + 1)}` : ''}`
+  : '—';
+const kinds = [
+  { key: 'post', label: '文章' },
+  { key: 'note', label: '随记' },
+  { key: 'chapter', label: '小说' },
+].map((k) => ({ ...k, n: items.filter((it) => it.kind === k.key).length }));
+---
+
+<Base title="归档" desc="一条河从最早流到今天，文章、随记、小说章节都浮在河上。">
+  <div class="page arc-page" data-pagefind-ignore>
+    <div class="wrap">
+      <div class="page-head">
+        <h1><span class="kicker">ARCHIVE</span>归档</h1>
+        <p>一条河从最早流到今天，越往下越新。文章、随记、小说章节都浮在河上。</p>
+        <div class="arc-stat">
+          {items.length} 条 · 跨 {span}
+          {kinds
+            .filter((k) => k.n)
+            .map((k) => ` · ${k.label} ${k.n}`)
+            .join('')}
+        </div>
+      </div>
+
+      {
+        items.length ? (
+          <div class="flow" style={`--step:${STEP}px; --amp:${AMP}%`}>
+            <svg
+              class="flow-line"
+              viewBox={`0 0 100 ${height}`}
+              preserveAspectRatio="none"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <defs>
+                {/* 河的配色不做霓虹，做成"倒映着黄昏的天"：靛蓝 → 夏蓝 → 青 → 暖金 → 霞粉 */}
+                <linearGradient id="flowGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop class="g-night" offset="0" stop-opacity="0" />
+                  <stop class="g-night" offset="0.06" stop-opacity="1" />
+                  <stop class="g-sky" offset="0.34" stop-opacity="0.95" />
+                  <stop class="g-cyan" offset="0.6" stop-opacity="0.9" />
+                  <stop class="g-gold" offset="0.78" stop-opacity="0.9" />
+                  <stop class="g-peach" offset="0.92" stop-opacity="0.85" />
+                  <stop class="g-peach" offset="1" stop-opacity="0" />
+                </linearGradient>
+                {/* 水面那道亮光的边缘：上下两头透明，中间实 */}
+                <linearGradient id="flowSpark" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#fff" stop-opacity="0" />
+                  <stop offset="0.32" stop-color="#fff" stop-opacity="0.85" />
+                  <stop offset="0.68" stop-color="#fff" stop-opacity="0.85" />
+                  <stop offset="1" stop-color="#fff" stop-opacity="0" />
+                </linearGradient>
+                {/* 细碎的那道波光，比主光带窄、比它快 */}
+                <linearGradient id="flowRipple" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#fff" stop-opacity="0" />
+                  <stop offset="0.5" stop-color="#fff" stop-opacity="0.7" />
+                  <stop offset="1" stop-color="#fff" stop-opacity="0" />
+                </linearGradient>
+                {/* 一条遮罩：整条河盖住，里面两块亮光各自往下平移，扫过的地方才亮 */}
+                <mask id="flowMask" maskUnits="userSpaceOnUse" x="-40" y="0" width="180" height={height}>
+                  <rect class="flow-band" x="-40" y={-BAND} width="180" height={BAND} fill="url(#flowSpark)">
+                    <animateTransform
+                      attributeName="transform"
+                      type="translate"
+                      values={`0 0; 0 ${height + BAND}`}
+                      dur="14s"
+                      repeatCount="indefinite"
+                    />
+                  </rect>
+                  <rect class="flow-band band-2" x="-40" y={-BAND} width="180" height={BAND} fill="url(#flowSpark)">
+                    <animateTransform
+                      attributeName="transform"
+                      type="translate"
+                      values={`0 0; 0 ${height + BAND}`}
+                      dur="14s"
+                      begin="-7s"
+                      repeatCount="indefinite"
+                    />
+                  </rect>
+                </mask>
+                {/* 波光遮罩：窄条、走得更快，读起来像水面碎光一路滑下去 */}
+                <mask id="flowRippleMask" maskUnits="userSpaceOnUse" x="-40" y="0" width="180" height={height}>
+                  <rect class="flow-ripple" x="-40" y={-RIPPLE} width="180" height={RIPPLE} fill="url(#flowRipple)">
+                    <animateTransform
+                      attributeName="transform"
+                      type="translate"
+                      values={`0 0; 0 ${height + RIPPLE}`}
+                      dur="22s"
+                      repeatCount="indefinite"
+                    />
+                  </rect>
+                  <rect class="flow-ripple ripple-2" x="-40" y={-RIPPLE} width="180" height={RIPPLE} fill="url(#flowRipple)">
+                    <animateTransform
+                      attributeName="transform"
+                      type="translate"
+                      values={`0 0; 0 ${height + RIPPLE}`}
+                      dur="22s"
+                      begin="-11s"
+                      repeatCount="indefinite"
+                    />
+                  </rect>
+                </mask>
+                <filter id="flowSoft" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="5" />
+                </filter>
+              </defs>
+              {/* 河床：一条糊开的粗线，给河一点厚度 */}
+              <path
+                class="flow-bed"
+                d={path}
+                fill="none"
+                stroke="url(#flowGrad)"
+                stroke-width="16"
+                vector-effect="non-scaling-stroke"
+                filter="url(#flowSoft)"
+              />
+              {/* 河身：细的那条，沿线从粉走到琥珀 */}
+              <path
+                class="flow-core"
+                d={path}
+                fill="none"
+                stroke="url(#flowGrad)"
+                stroke-width="2"
+                vector-effect="non-scaling-stroke"
+              />
+              {/* 流水：同样一条线，只让遮罩里那两块亮光露出来，一层层往下淌 */}
+              <path
+                class="flow-spark"
+                d={path}
+                fill="none"
+                stroke="#FFF4E2"
+                stroke-width="9"
+                stroke-linecap="round"
+                vector-effect="non-scaling-stroke"
+                mask="url(#flowMask)"
+              />
+              {/* 波光：更细更亮的一条窄带，走得更快，像水面的碎光 */}
+              <path
+                class="flow-glint"
+                d={path}
+                fill="none"
+                stroke="#FFFFFF"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                vector-effect="non-scaling-stroke"
+                mask="url(#flowRippleMask)"
+              />
+            </svg>
+
+            <ol class="flow-rows">
+              {items.map((it, i) => (
+                <li class={`flow-row side-${i % 2 === 0 ? 'left' : 'right'} k-${it.kind}`}>
+                  <a class="flow-card" href={it.href}>
+                    <span class="flow-kind">{it.label}</span>
+                    <b>{it.title}</b>
+                    {it.sub ? <em>{it.sub}</em> : null}
+                  </a>
+                  <span class="flow-node" aria-hidden="true" />
+                  <time datetime={it.date.toISOString()}>{day(it.date)}</time>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : (
+          <p class="arc-empty">还没有能归档的东西。</p>
+        )
+      }
+    </div>
+  </div>
+</Base>

@@ -1,0 +1,50 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { link } from '../../utils/url';
+
+const works = (await getCollection('novels', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.updated.getTime() - a.data.updated.getTime()
+);
+const chaptersAll = await getCollection('chapters', ({ data }) => !data.draft);
+
+const countByWork = new Map();
+for (const c of chaptersAll) {
+  const key = c.id.split('/')[0];
+  countByWork.set(key, (countByWork.get(key) || 0) + 1);
+}
+
+const pad = (n) => String(n).padStart(2, '0');
+const fmt = (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+---
+
+<Base title="小说" desc="长的那种。连载中的、筹备中的，都在这儿。">
+  <div class="page" data-pagefind-ignore>
+    <div class="wrap">
+      <div class="page-head">
+        <h1><span class="kicker">FICTION</span>小说</h1>
+        <p>长的那种。连载中的、筹备中的，都在这儿。</p>
+      </div>
+
+      <div class="novel-grid">
+        {
+          works.map((w) => (
+            <a class="novel-card" href={link(`/novels/${w.id}/`)}>
+              <span class="novel-status">{w.data.status}</span>
+              <h2 class="novel-title">{w.data.title}</h2>
+              {w.data.subtitle ? <span class="novel-sub">{w.data.subtitle}</span> : null}
+              <p class="novel-sum">{w.data.summary}</p>
+              <span class="novel-meta">
+                {(countByWork.get(w.id) || 0)} 章 · 最近更新 {fmt(w.data.updated)}
+              </span>
+            </a>
+          ))
+        }
+      </div>
+
+      <p class="plain-note">
+        作品会一部一部加。每部里面按章节排，读起来像翻开一本。
+      </p>
+    </div>
+  </div>
+</Base>

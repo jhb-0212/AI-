@@ -1,0 +1,125 @@
+---
+import { site } from '../data/site';
+import { link } from '../utils/url';
+
+const path = Astro.url.pathname;
+const base = import.meta.env.BASE_URL || '/';
+const rel = path.slice(base.length - 1);
+const hasPortfolio = Boolean(site.portfolioUrl);
+
+const items = [
+  { href: '/', label: '首页', match: (p) => p === '/' || p === '' },
+  { href: '/writing/', label: '文章', match: (p) => p.startsWith('/writing') },
+  { href: '/notes/', label: '随记', match: (p) => p.startsWith('/notes') },
+  { href: '/novels/', label: '小说', match: (p) => p.startsWith('/novels') },
+  { href: '/gallery/', label: '相册', match: (p) => p.startsWith('/gallery') },
+  { href: '/archive/', label: '归档', match: (p) => p.startsWith('/archive') },
+  { href: '/music/', label: '音乐', match: (p) => p.startsWith('/music') },
+  { href: '/doing/', label: '在做', match: (p) => p.startsWith('/doing') },
+  { href: '/about/', label: '关于我', match: (p) => p.startsWith('/about') },
+];
+---
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href={link('/')}>
+      <span class="brand-dot" aria-hidden="true"></span>
+      <span class="brand-cn">{site.name}</span>
+      <span class="brand-en">{site.en}</span>
+    </a>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-menu" aria-label="展开菜单">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="menu" id="site-menu" aria-label="主导航">
+      {
+        items.map((it) => (
+          <a href={link(it.href)} aria-current={it.match(rel) ? 'page' : undefined}>
+            {it.label}
+          </a>
+        ))
+      }
+      <a
+        class="ext"
+        href={hasPortfolio ? site.portfolioUrl : '#'}
+        data-ext="portfolio"
+        target={hasPortfolio ? '_blank' : undefined}
+        rel={hasPortfolio ? 'noopener' : undefined}>作品集</a
+      >
+    </nav>
+
+    <button
+      class="set-btn"
+      type="button"
+      aria-expanded="false"
+      aria-controls="sets"
+      aria-label="打开设置"
+    >
+      <svg
+        class="i"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path
+          d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
+        ></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    </button>
+  </div>
+
+  <aside class="sets" id="sets" aria-hidden="true" aria-labelledby="sets-title">
+    <div class="sets-head">
+      <b id="sets-title">设置</b>
+      <button class="sets-close" type="button" aria-label="关闭设置">×</button>
+    </div>
+    <div class="sets-body">
+      <div class="set-group">
+        <div class="set-label">背景图</div>
+        <div class="set-bg-thumbs">
+          <button type="button" data-bg="img:hero-bg.jpg" style={`background-image: url(${base}/hero-bg.jpg)`} aria-label="青山云海"></button>
+          <button type="button" data-bg="img:bg-star.jpg" style={`background-image: url(${base}/bg-star.jpg)`} aria-label="星空"></button>
+          <button type="button" data-bg="img:bg-sakura.jpg" style={`background-image: url(${base}/bg-sakura.jpg)`} aria-label="樱花"></button>
+          <button type="button" data-bg="img:bg-ocean.jpg" style={`background-image: url(${base}/bg-ocean.jpg)`} aria-label="海边日落"></button>
+          <button type="button" data-bg="img:bg-city.jpg" style={`background-image: url(${base}/bg-city.jpg)`} aria-label="城市夜景"></button>
+        </div>
+      </div>
+    </div>
+  </aside>
+</header>
+
+<script>
+  const base = import.meta.env.BASE_URL;
+
+  function applyBg(val) {
+    const bgImg = document.querySelector('.hero-bg-img');
+    const bgOverlay = document.querySelector('.hero-bg-overlay');
+    if (!bgImg) return;
+    const [type, ...rest] = val.split(':');
+    const v = rest.join(':');
+    if (type === 'img') {
+      bgImg.style.background = 'none';
+      bgImg.style.backgroundImage = 'url(' + base + '/' + v + ')';
+      if (bgOverlay) bgOverlay.style.background = '';
+    }
+    document.querySelectorAll('.set-bg-thumbs button').forEach(b => {
+      b.classList.toggle('is-active', b.dataset.bg === val);
+    });
+    try { localStorage.setItem('nepenthe-bg', val); } catch (e) {}
+  }
+
+  try {
+    const saved = localStorage.getItem('nepenthe-bg');
+    if (saved) applyBg(saved);
+  } catch (e) {}
+
+  document.querySelectorAll('.set-bg-thumbs button').forEach(btn => {
+    btn.addEventListener('click', () => applyBg(btn.dataset.bg));
+  });
+</script>

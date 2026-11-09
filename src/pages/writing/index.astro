@@ -1,0 +1,44 @@
+---
+import Base from '../../layouts/Base.astro';
+import PostRow from '../../components/PostRow.astro';
+import { getCollection } from 'astro:content';
+
+const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime()
+);
+
+const groups = [];
+for (const post of posts) {
+  const y = post.data.date.getFullYear();
+  const last = groups[groups.length - 1];
+  if (last && last.year === y) last.items.push(post);
+  else groups.push({ year: y, items: [post] });
+}
+---
+
+<Base title="文章" desc="写得出来的都放这儿。没被采纳的句子、删掉的镜头、半夜推翻的结构，也算。">
+  <div class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <h1><span class="kicker">WORDS</span>文章</h1>
+        <p>写得出来的都放这儿。没被采纳的句子、删掉的镜头、半夜推翻的结构，也算。</p>
+      </div>
+      {
+        groups.map((g) => (
+          <>
+            <div class="year-mark">
+              <span>{g.year}</span>
+              <i></i>
+              <span>{g.items.length} 篇</span>
+            </div>
+            <ul class="posts">
+              {g.items.map((post) => (
+                <PostRow post={post} />
+              ))}
+            </ul>
+          </>
+        ))
+      }
+    </div>
+  </div>
+</Base>

@@ -1,0 +1,70 @@
+---
+import Base from '../layouts/Base.astro';
+import { link } from '../utils/url';
+---
+
+<Base title="找不到这一页" desc="这一页不存在，或者已经被删了。">
+  <div class="page notfound">
+    <div class="wrap">
+      <div class="nf">
+        <span class="nf-code" aria-hidden="true">404</span>
+        <h1>这条巷子没有门牌</h1>
+        <p>地址可能写错了，也可能这篇写完又收回去了。回首页，或者从存档里翻。</p>
+        <div class="nf-act">
+          <a class="btn btn-primary" href={link('/')}>回首页</a>
+          <a class="btn btn-ghost" href={link('/search/')} data-search-entry>站内搜索</a>
+          <a class="btn btn-ghost" href={link('/archive/')}>翻存档</a>
+        </div>
+        <p class="nf-hint">想找某篇？按 <kbd>/</kbd> 直接进搜索。</p>
+      </div>
+    </div>
+  </div>
+</Base>
+
+<style>
+  .nf {
+    max-width: 560px;
+  }
+  .nf-code {
+    display: block;
+    font-family: var(--serif);
+    font-size: clamp(72px, 13vw, 132px);
+    line-height: 0.84;
+    letter-spacing: 0.02em;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(255, 196, 107, 0.52);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+  }
+  .nf h1 {
+    font-family: var(--serif);
+    font-size: clamp(22px, 3.4vw, 30px);
+    margin: 18px 0 10px;
+    color: var(--ink);
+  }
+  .nf p {
+    color: var(--dim);
+    font-size: 14.5px;
+    line-height: 1.85;
+    max-width: 40em;
+  }
+  .nf-act {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .nf-hint {
+    margin-top: 22px;
+    font-size: 12.5px;
+    color: var(--faint);
+  }
+  .nf-hint kbd {
+    font-family: var(--sans, inherit);
+    font-size: 11.5px;
+    padding: 1px 6px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--dim);
+  }
+</style>

@@ -1,0 +1,54 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+import { site } from '../../data/site';
+import { link } from '../../utils/url';
+
+const all = (await getCollection('notes', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime()
+);
+const rows = await Promise.all(
+  all.map(async (n) => {
+    const { Content } = await render(n);
+    return { note: n, Content };
+  })
+);
+
+const pad = (n) => String(n).padStart(2, '0');
+const fmt = (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+const fmtFull = (d) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+---
+
+<Base title="随记" desc="没长到能写成文章的那些话。一天一句，或者三天一句，想起来就记。">
+  <div class="page moments-page">
+    <div class="wrap" data-pagefind-ignore>
+      <div class="page-head">
+        <h1><span class="kicker" data-pagefind-ignore>NOTES</span>随记</h1>
+        <p>没长到能写成文章的那些话。一天一句，或者三天一句，想起来就记。</p>
+      </div>
+    </div>
+
+    <div class="wrap moments-wrap" data-pagefind-body>
+      <div class="moments-list">
+        {
+          rows.map(({ note, Content }) => (
+            <div class="moment" id={`note-${note.id}`}>
+              <div class="moment-avatar">
+                <img src={`${import.meta.env.BASE_URL}/avatar.png`} alt="头像" />
+              </div>
+              <div class="moment-content">
+                <div class="moment-name">忘忧居主</div>
+                <div class="moment-text">
+                  <Content />
+                </div>
+                <div class="moment-meta">
+                  <span class="moment-time">{fmtFull(note.data.date)}</span>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</Base>

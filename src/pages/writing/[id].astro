@@ -1,0 +1,81 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+import { link } from '../../utils/url';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts', ({ data }) => !data.draft);
+  return posts.map((post) => ({ params: { id: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+
+const all = (await getCollection('posts', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime()
+);
+const i = all.findIndex((p) => p.id === post.id);
+const newer = i > 0 ? all[i - 1] : undefined;
+const older = i >= 0 && i < all.length - 1 ? all[i + 1] : undefined;
+
+const d = post.data.date;
+const pad = (n) => String(n).padStart(2, '0');
+const dateText = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+---
+
+<Base title={post.data.title} desc={post.data.summary} type="article">
+  <Fragment slot="head">
+    <meta property="article:published_time" content={post.data.date.toISOString()} />
+    <meta property="article:tag" content={post.data.tag} />
+  </Fragment>
+  <article class="article">
+    <div class="wrap">
+      <a class="back" href={link('/writing/')}>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M19 12H6M11 6l-6 6 6 6"></path>
+        </svg>
+        回到文章
+      </a>
+      <div class="article-top">
+        <h1>{post.data.title}</h1>
+        <div class="art-meta">
+          <span class="tag">{post.data.tag}</span>
+          <span>{dateText}</span>
+          <span>{post.data.readTime}</span>
+        </div>
+      </div>
+      <div class="art-body drop" data-pagefind-body>
+        <Content />
+      </div>
+
+      <div class="pager">
+        {
+          newer ? (
+            <a href={link(`/writing/${newer.id}/`)}>
+              <span>更新的一篇</span>
+              <b>{newer.data.title}</b>
+            </a>
+          ) : (
+            <div class="disabled">
+              <span>更新的一篇</span>
+              <b>已经是第一篇</b>
+            </div>
+          )
+        }
+        {
+          older ? (
+            <a href={link(`/writing/${older.id}/`)}>
+              <span>更早的一篇</span>
+              <b>{older.data.title}</b>
+            </a>
+          ) : (
+            <div class="disabled">
+              <span>更早的一篇</span>
+              <b>到底了</b>
+            </div>
+          )
+        }
+      </div>
+    </div>
+  </article>
+</Base>

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# 站内搜索页没有独立内容，不让搜索引擎收录
+Disallow: /search/
+
+# sitemap 索引（带 base 前缀 /AI-）
+Sitemap: https://jhb-0212.github.io/AI-/sitemap-index.xml

@@ -1,0 +1,22 @@
+[Unit]
+Description=Nepenthe CMS (FastAPI + SQLAlchemy)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/nepenthe/server
+EnvironmentFile=/etc/nepenthe.env
+# SQLite 只能用 1 个 worker：多进程会抢写锁，偶发 database is locked。
+# 换成 PostgreSQL 后再加 --workers 2 或 4。
+ExecStart=/srv/nepenthe/server/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100 --workers 1
+Restart=always
+RestartSec=3
+
+# 只让它写自己的目录
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

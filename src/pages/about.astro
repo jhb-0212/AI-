@@ -1,0 +1,200 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../data/site';
+
+const base = import.meta.env.BASE_URL;
+const c = site.contact;
+
+const skills = [
+  { group: '后端', type: 'backend', items: ['Python', 'Flask', 'FastAPI', 'Node.js'] },
+  { group: '前端', type: 'frontend', items: ['Vue3', 'Astro', 'Bootstrap', 'ECharts'] },
+  { group: '数据库', type: 'database', items: ['MySQL', 'Redis', 'SQLAlchemy'] },
+  { group: '工具', type: 'tool', items: ['Docker', 'Playwright', 'Ollama', 'Git'] },
+];
+
+const interests = [
+  { name: '王者荣耀', desc: '荣耀王者 2000h+', quote: '韧性，是比天赋更珍贵的东西。' },
+  { name: '三角洲行动', desc: '巅峰 900h+', quote: '在绝境中，冷静是唯一的武器。' },
+  { name: '黑神话：悟空', desc: '通关两遍', quote: '踏碎凌霄，放肆桀骜。' },
+  { name: '凡人修仙传', desc: '追更中', quote: '凡人落凡尘，修仙修心。' },
+  { name: '剑来', desc: '老书虫', quote: '遇事不绝，可问春风。' },
+];
+
+const timeline = [
+  { time: '2023.09', title: '入学韶关学院', desc: '信息与计算科学专业' },
+  { time: '2024.03', title: '运营校园墙', desc: '校级校园墙运营负责人' },
+  { time: '2025.06', title: '开始做 AIGC', desc: 'AI 影视、漫剧方向' },
+  { time: '2026.03', title: '毕业论文', desc: 'PCA-VaR 股票投资组合风险度量' },
+];
+
+const likes = [
+  { cat: '常听', items: ['陈奕迅', '朴树', '李宗盛', '万能青年旅店'] },
+  { cat: '喜欢', items: ['是枝裕和', '诺兰', '新海诚'] },
+];
+---
+
+<Base title="关于我" desc={site.desc}>
+  <div class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <div class="kicker">About</div>
+        <h1>关于我</h1>
+      </div>
+
+      <!-- 头像 + 简介 -->
+      <div class="about-card">
+        <div class="about-avatar">
+          <img src={`${base}/avatar.png`} alt="头像" />
+        </div>
+        <div class="about-info">
+          <h2>忘忧居主</h2>
+          {site.bio.map((b) => <p class="about-bio">{b}</p>)}
+        </div>
+      </div>
+
+      <!-- 基本信息 -->
+      <div class="about-section">
+        <h3 class="section-title">基本信息</h3>
+        <div class="about-facts">
+          {site.facts.map((f) => (
+            <div class="fact-item">
+              <span class="fact-k">{f.k}</span>
+              <span class="fact-v">{f.v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- 联系方式 -->
+      <div class="about-section">
+        <h3 class="section-title">联系方式</h3>
+        <div class="contact-grid">
+          <a class="contact-item" href={`https://github.com/${c.github}`} target="_blank" rel="noopener">
+            <span class="contact-label">GitHub</span>
+            <span class="contact-value">@{c.github}</span>
+          </a>
+          <a class="contact-item" href={`mailto:${c.email}`}>
+            <span class="contact-label">邮箱</span>
+            <span class="contact-value">{c.email}</span>
+          </a>
+          <div class="contact-item" data-copy={c.wechatId}>
+            <span class="contact-label">微信</span>
+            <span class="contact-value">{c.wechatId}</span>
+          </div>
+          <div class="contact-item">
+            <span class="contact-label">抖音</span>
+            <span class="contact-value">{c.douyin}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 技能栈 -->
+      <div class="about-section">
+        <h3 class="section-title">技能栈</h3>
+        <div class="skills-grid">
+          {skills.map((s) => (
+            <div class="skill-group" data-type={s.type}>
+              <div class="skill-group-title">{s.group}</div>
+              <div class="skill-tags">
+                {s.items.map((item) => <span class="skill-tag">{item}</span>)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- 兴趣爱好 -->
+      <div class="about-section">
+        <h3 class="section-title">兴趣爱好</h3>
+        <div class="interests-grid">
+          {interests.map((i) => (
+            <button class="interest-item" type="button" data-quote={i.quote}>
+              <div class="interest-name">{i.name}</div>
+              <div class="interest-desc">{i.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <!-- 彩蛋浮窗 -->
+      <div class="quote-tooltip" id="quoteTooltip" hidden>
+        <div class="quote-tooltip-inner">
+          <span class="quote-tooltip-mark">"</span>
+          <p class="quote-tooltip-text"></p>
+          <span class="quote-tooltip-mark right">"</span>
+        </div>
+      </div>
+
+      <!-- 时间线 -->
+      <div class="about-section">
+        <h3 class="section-title">经历</h3>
+        <div class="timeline">
+          {timeline.map((t) => (
+            <div class="timeline-item">
+              <div class="timeline-time">{t.time}</div>
+              <div class="timeline-content">
+                <div class="timeline-title">{t.title}</div>
+                <div class="timeline-desc">{t.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- 喜欢的东西 -->
+      <div class="about-section">
+        <h3 class="section-title">喜欢</h3>
+        <div class="likes-grid">
+          {likes.map((l) => (
+            <div class="like-group">
+              <div class="like-cat">{l.cat}</div>
+              <div class="like-items">
+                {l.items.map((item) => <span class="like-item">{item}</span>)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</Base>
+
+<script>
+  // 彩蛋浮窗：点击爱好卡片弹出台词
+  const tooltip = document.getElementById('quoteTooltip');
+  const tooltipText = tooltip?.querySelector('.quote-tooltip-text');
+  const items = document.querySelectorAll<HTMLElement>('.interest-item');
+
+  let hideTimer: number | null = null;
+
+  items.forEach((item) => {
+    item.addEventListener('click', (e) => {
+      const quote = item.dataset.quote;
+      if (!quote || !tooltip || !tooltipText) return;
+
+      tooltipText.textContent = quote;
+      tooltip.hidden = false;
+
+      const rect = item.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top - 12;
+
+      tooltip.style.left = `${x}px`;
+      tooltip.style.top = `${y}px`;
+
+      if (hideTimer) window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(() => {
+        tooltip.hidden = true;
+      }, 2500);
+    });
+  });
+
+  // 点击其他地方关闭浮窗
+  document.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (!t.closest('.interest-item') && tooltip) {
+      tooltip.hidden = true;
+    }
+  });
+</script>

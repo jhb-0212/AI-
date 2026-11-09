@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#07050c"/>
+      <stop offset="0.55" stop-color="#0e1a30"/>
+      <stop offset="0.82" stop-color="#3a2a4a"/>
+      <stop offset="1" stop-color="#ff7a5c"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0.78" cy="0.18" r="0.55">
+      <stop offset="0" stop-color="#ff6b8b" stop-opacity="0.85"/>
+      <stop offset="0.35" stop-color="#7c8cf8" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#7c8cf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff6b8b"/>
+      <stop offset="1" stop-color="#59d8f0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#sky)"/>
+  <rect width="1200" height="630" fill="url(#orb)"/>
+
+  <circle cx="936" cy="113" r="52" fill="none" stroke="#ffc46b" stroke-opacity="0.35" stroke-width="1.5"/>
+  <circle cx="936" cy="113" r="76" fill="none" stroke="#ffc46b" stroke-opacity="0.18" stroke-width="1"/>
+
+  <text x="90" y="120" font-family="Georgia, 'Noto Serif SC', serif" font-size="30" letter-spacing="4" fill="#8a93b5">N E P E N T H E</text>
+
+  <text x="86" y="330" font-family="'Noto Serif SC', Georgia, serif" font-size="120" font-weight="900" fill="url(#word)">忘忧居</text>
+
+  <text x="90" y="404" font-family="'Noto Sans SC', sans-serif" font-size="34" fill="#d9deee">在做 AIGC，也在写文案。</text>
+  <text x="90" y="456" font-family="'Noto Sans SC', sans-serif" font-size="24" fill="#8a93b5">声音 · 文章 · 正在做的事，以及作品集入口。</text>
+
+  <line x1="90" y1="540" x2="460" y2="540" stroke="#ff6b8b" stroke-width="2"/>
+</svg>

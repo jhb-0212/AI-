@@ -1,0 +1,60 @@
+---
+import Base from '../../layouts/Base.astro';
+import { link } from '../../utils/url';
+
+const baseUrl = import.meta.env.BASE_URL || '/';
+---
+
+<Base title="搜索" desc="搜文章、随记、小说的正文。">
+  <div class="page search-page" data-pagefind-ignore>
+    <div class="wrap">
+      <div class="page-head">
+        <h1><span class="kicker">SEARCH</span>搜索</h1>
+        <p>搜文章、随记、小说的正文。输入两个字就能出结果。</p>
+      </div>
+
+      <div id="search-panel" class="search-panel">
+        <pagefind-config bundle-path={baseUrl + 'pagefind/'} base-url={baseUrl} lang="zh-cn" />
+        <pagefind-searchbox placeholder="搜文章、随记、小说…" />
+        <pagefind-results />
+        <p class="search-fallback" hidden>
+          搜索索引还没生成。本地开发请先 <code>npm run build</code> 再 <code>npm run preview</code>，线上部署时构建会自动带上索引。
+        </p>
+      </div>
+
+      <p class="plain-note">
+        索引在构建时生成，纯静态，不需要服务器。搜不到就说明这个词确实没写过。
+      </p>
+    </div>
+  </div>
+
+  <link rel="stylesheet" href={link('/pagefind/pagefind-component-ui.css')} slot="head" />
+  <script is:inline define:vars={{ baseUrl }}>
+    window.addEventListener('DOMContentLoaded', function () {
+      // 组件 UI 用的是自定义元素（pagefind-searchbox / pagefind-results），
+      // 脚本加载后才会注册这些元素；再用 configureInstance 指定语言与资源路径。
+      var s = document.createElement('script');
+      s.src = baseUrl + 'pagefind/pagefind-component-ui.js';
+      s.onload = function () {
+        var comps = window.PagefindComponents;
+        if (!comps) return;
+        comps.configureInstance('default', {
+          bundlePath: baseUrl + 'pagefind/',
+          uiLanguages: ['zh-cn'],
+        });
+        // 首页搜索条带过来的 ?q=，自动搜一次
+        var q = new URLSearchParams(location.search).get('q');
+        if (q) {
+          comps.getInstanceManager().getInstance('default').triggerSearch(q);
+        }
+      };
+      // dev 模式下没有 /pagefind/ 索引，脚本 404，搜索框渲染不出来；
+      // 这时把提示亮出来，别让用户对着一个空页面。
+      s.onerror = function () {
+        var fb = document.querySelector('.search-fallback');
+        if (fb) fb.hidden = false;
+      };
+      document.body.appendChild(s);
+    });
+  </script>
+</Base>

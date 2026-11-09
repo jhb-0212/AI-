@@ -1,0 +1,43 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../data/site';
+---
+
+<Base title="在做" desc="这一页只回答一件事：我把时间花在哪。不写计划，只写正在进行的。">
+  <div class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <h1><span class="kicker">NOW</span>在做</h1>
+        <p>这一页只回答一件事：我把时间花在哪。不写计划，只写正在进行的。</p>
+      </div>
+
+      <p class="now-lead">
+        白天写代码和论文，晚上写文案、剪片子。<strong>不追求样样精通</strong>，但要求每一件拿出来的东西，自己愿意署名。
+      </p>
+
+      <div class="doing-grid now-grid">
+        {
+          site.doing.map((d) => (
+            <article class="doing-card">
+              <span class="state">{d.state}</span>
+              <h3>{d.title}</h3>
+              <div class="sub">{d.sub}</div>
+              <p class="note">{d.noteLong}</p>
+            </article>
+          ))
+        }
+      </div>
+
+      <div class="facts">
+        {
+          site.facts.map((f) => (
+            <div class="fact">
+              <em>{f.k}</em>
+              <b>{f.v}</b>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</Base>

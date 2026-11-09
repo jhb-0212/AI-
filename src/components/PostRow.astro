@@ -1,0 +1,20 @@
+---
+import { link } from '../utils/url';
+
+const { post } = Astro.props;
+const d = post.data.date;
+const pad = (n) => String(n).padStart(2, '0');
+const dateText = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+---
+
+<li>
+  <a class="post-row" href={link(`/writing/${post.id}/`)}>
+    <span class="post-meta">
+      <span class="tag">{post.data.tag}</span>
+      <span>{dateText}</span>
+      <span>{post.data.readTime}</span>
+    </span>
+    <span class="post-title">{post.data.title}</span>
+    <p class="post-sum">{post.data.summary}</p>
+  </a>
+</li>

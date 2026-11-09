@@ -1,0 +1,116 @@
+<div class="orb-wrap"><canvas id="orb" aria-hidden="true"></canvas></div>
+
+<script>
+  // 天光：整页唯一的签名元素。四团径向渐变缓慢漂移，mix-blend-mode: screen 叠在夜蓝底上。
+  // 不求画出一张风景，只让这块地方看起来像一扇窗——右边太阳快贴到地平线，
+  // 中间一层霞横着铺开，左边和顶上还是白天没走完的那种蓝。
+  const c = document.getElementById('orb');
+  if (c && c.getContext) {
+    const ctx = c.getContext('2d');
+    let W = 0,
+      H = 0,
+      raf = 0,
+      last = 0,
+      visible = true;
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const COLORS = [
+      [255, 196, 168], // 夕照橙粉：落下去的那颗
+      [255, 143, 171], // 樱花霞：贴着地平线的一层
+      [130, 150, 230], // 高空蓝
+      [167, 139, 250], // 暮紫
+    ];
+    // sx / sy 用来把光团压成横条：霞和天都是横着走的，不是圆球
+    const BLOBS = [
+      { c: 0, x: 0.7, y: 0.46, r: 0.28, ax: 0.028, ay: 0.03, sx: 1.0, sy: 1.0, sp: 0.00017, ph: 0.0, a: 0.72 },
+      { c: 1, x: 0.46, y: 0.6, r: 0.42, ax: 0.05, ay: 0.02, sx: 1.6, sy: 0.5, sp: 0.00024, ph: 1.7, a: 0.52 },
+      { c: 2, x: 0.14, y: 0.16, r: 0.46, ax: 0.04, ay: 0.03, sx: 1.3, sy: 0.85, sp: 0.00021, ph: 3.1, a: 0.42 },
+      { c: 3, x: 0.52, y: 0.24, r: 0.4, ax: 0.05, ay: 0.028, sx: 1.45, sy: 0.75, sp: 0.00019, ph: 4.4, a: 0.34 },
+    ];
+    // 星点：固定几颗，配合光团一起漂，做出"黄昏转夜"那一瞬间的天
+    const STARS = [
+      { x: 0.18, y: 0.12, r: 1.1, a: 0.7 },
+      { x: 0.3, y: 0.26, r: 0.8, a: 0.55 },
+      { x: 0.42, y: 0.08, r: 1.3, a: 0.6 },
+      { x: 0.62, y: 0.18, r: 0.9, a: 0.5 },
+      { x: 0.82, y: 0.3, r: 1.0, a: 0.45 },
+      { x: 0.9, y: 0.08, r: 1.2, a: 0.55 },
+      { x: 0.24, y: 0.42, r: 0.7, a: 0.4 },
+      { x: 0.72, y: 0.5, r: 0.8, a: 0.38 },
+    ];
+
+    function resize() {
+      const rect = c.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = Math.max(1, Math.round(rect.width));
+      H = Math.max(1, Math.round(rect.height));
+      c.width = Math.round(W * dpr);
+      c.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      paint(performance.now());
+    }
+
+    function paint(now) {
+      ctx.clearRect(0, 0, W, H);
+      const m = Math.min(W, H);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < BLOBS.length; i++) {
+        const b = BLOBS[i];
+        const tx = b.x + Math.sin(now * b.sp + b.ph) * b.ax;
+        const ty = b.y + Math.cos(now * b.sp * 1.21 + b.ph) * b.ay;
+        const R = b.r * m * (1 + Math.sin(now * b.sp * 0.7 + b.ph) * 0.06);
+        const col = COLORS[b.c];
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+        g.addColorStop(0, 'rgba(' + col[0] + ',' + col[1] + ',' + col[2] + ',' + b.a + ')');
+        g.addColorStop(0.4, 'rgba(' + col[0] + ',' + col[1] + ',' + col[2] + ',' + b.a * 0.36 + ')');
+        g.addColorStop(1, 'rgba(' + col[0] + ',' + col[1] + ',' + col[2] + ',0)');
+        ctx.save();
+        ctx.translate(tx * W, ty * H);
+        ctx.scale(b.sx, b.sy);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      // 星点：几粒细光，跟着天色一起呼吸，让右上角像刚要入夜的天
+      for (let i = 0; i < STARS.length; i++) {
+        const s = STARS[i];
+        const tw = 0.6 + 0.4 * Math.sin(now * 0.0011 + s.x * 40 + s.y * 17);
+        ctx.fillStyle = 'rgba(238, 240, 255,' + (s.a * tw).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    function tick(now) {
+      raf = 0;
+      if (!visible || document.hidden) return;
+      if (now - last > 32) {
+        last = now;
+        paint(now);
+      }
+      raf = requestAnimationFrame(tick);
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+
+    if (reduced) {
+      paint(0);
+    } else {
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver((entries) => {
+          visible = entries[0].isIntersecting;
+          if (visible && !raf) raf = requestAnimationFrame(tick);
+        }).observe(c);
+      }
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && visible && !raf) raf = requestAnimationFrame(tick);
+      });
+      raf = requestAnimationFrame(tick);
+    }
+  }
+</script>

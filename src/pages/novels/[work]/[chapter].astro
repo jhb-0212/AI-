@@ -1,0 +1,86 @@
+---
+import Base from '../../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+import { link } from '../../../utils/url';
+
+export async function getStaticPaths() {
+  const chapters = await getCollection('chapters', ({ data }) => !data.draft);
+  return chapters.map((chapter) => {
+    const [work, slug] = chapter.id.split('/');
+    return { params: { work, chapter: slug }, props: { chapter, workId: work } };
+  });
+}
+
+const { chapter, workId } = Astro.props;
+const { Content } = await render(chapter);
+
+const works = await getCollection('novels');
+const work = works.find((w) => w.id === workId);
+
+const siblings = (await getCollection('chapters', ({ data }) => !data.draft))
+  .filter((c) => c.id.split('/')[0] === workId)
+  .sort((a, b) => a.data.order - b.data.order);
+
+const i = siblings.findIndex((c) => c.id === chapter.id);
+const prev = i > 0 ? siblings[i - 1] : undefined;
+const next = i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : undefined;
+
+const pad = (n) => String(n).padStart(2, '0');
+const fmt = (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+const slugOf = (c) => c.id.split('/')[1];
+---
+
+<Base title={`${chapter.data.title} · ${work ? work.data.title : ''}`} desc={work ? work.data.summary : undefined}>
+  <article class="article" data-pagefind-ignore>
+    <div class="wrap">
+      <a class="back" href={link(`/novels/${workId}/`)}>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M19 12H6M11 6l-6 6 6 6"></path>
+        </svg>
+        {work ? work.data.title : '作品目录'}
+      </a>
+
+      <div class="article-top">
+        <h1>{chapter.data.title}</h1>
+        <div class="art-meta">
+          {work ? <span class="tag">{work.data.title}</span> : null}
+          <span>第 {i + 1} 章</span>
+          <span>{fmt(chapter.data.date)}</span>
+        </div>
+      </div>
+
+      <div class="art-body" data-pagefind-body>
+        <Content />
+      </div>
+
+      <div class="pager">
+        {
+          prev ? (
+            <a href={link(`/novels/${workId}/${slugOf(prev)}/`)}>
+              <span>上一章</span>
+              <b>{prev.data.title}</b>
+            </a>
+          ) : (
+            <div class="disabled">
+              <span>上一章</span>
+              <b>这是第一章</b>
+            </div>
+          )
+        }
+        {
+          next ? (
+            <a href={link(`/novels/${workId}/${slugOf(next)}/`)}>
+              <span>下一章</span>
+              <b>{next.data.title}</b>
+            </a>
+          ) : (
+            <div class="disabled">
+              <span>下一章</span>
+              <b>还没写到这里</b>
+            </div>
+          )
+        }
+      </div>
+    </div>
+  </article>
+</Base>

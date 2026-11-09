@@ -1,0 +1,593 @@
+---
+import Base from '../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { site } from '../data/site';
+import { photos } from '../data/photos';
+import { link } from '../utils/url';
+
+const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime()
+);
+const notes = (await getCollection('notes', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime()
+);
+
+const pad = (n) => String(n).padStart(2, '0');
+const fmt = (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+const trim = (s, n = 40) => (s.length > n ? `${s.slice(0, n)}…` : s);
+
+// 联系方式：填用户名就补成完整地址，填完整地址就原样用。
+const c = site.contact;
+const isUrl = (v) => /^https?:\/\//.test(v);
+const ghUrl = c.github
+  ? isUrl(c.github)
+    ? c.github
+    : `https://github.com/${c.github.replace(/^@/, '')}`
+  : '';
+const ghLabel = c.github
+  ? isUrl(c.github)
+    ? c.github.replace(/^https?:\/\//, '').replace(/\/$/, '')
+    : `@${c.github.replace(/^@/, '')}`
+  : '';
+const dyUrl = c.douyin
+  ? isUrl(c.douyin)
+    ? c.douyin
+    : `https://www.douyin.com/search/${encodeURIComponent(c.douyin)}`
+  : '';
+const dyLabel = c.douyin ? (isUrl(c.douyin) ? '抖音主页' : c.douyin) : '';
+
+// 音乐卡只留一张「现在在听」，点整张卡进音乐页。
+const tracks = site.tracks;
+const cur = 0;
+
+const latest = posts[0];
+const rest = posts.slice(1, 3);
+const latestNotes = notes.slice(0, 3);
+const hasPortfolio = Boolean(site.portfolioUrl);
+
+// 首屏格言卡：SSR 先渲染第一条，JS 负责点刷新换句
+const quotes = [
+  { text: '星光不问赶路人，时光不负有心人。', from: '佚名' },
+  { text: '既然选择了远方，便只顾风雨兼程。', from: '汪国真' },
+  { text: '把一件事讲清楚，比算对一个数难。', from: site.name },
+  { text: '山脚太挤了，我们山顶见。', from: '写给后来的人' },
+];
+// 打字机轮播的句子
+const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '日更是逼自己讲清楚'];
+---
+
+<Base>
+  <section class="hero-full">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="hero-bg-img" style={`background-image: url(${import.meta.env.BASE_URL}/hero-bg.jpg)`}></div>
+      <div class="hero-bg-overlay"></div>
+    </div>
+
+    <div class="hero-center">
+      <div class="hero-pill">{site.name}</div>
+
+      <p class="hero-hi">HERE LIVES A WORRILESS SOUL</p>
+      <h1 class="hero-type"><span class="typed" id="typed"></span></h1>
+
+      <div class="hero-quote">
+        <button class="quote-refresh" type="button" aria-label="换一句格言">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+            <path d="M21 3v6h-6"></path>
+          </svg>
+        </button>
+        <div class="quote-body">
+          <p class="quote-text" id="quote-text">{quotes[0].text}</p>
+          <p class="quote-from" id="quote-from">—— {quotes[0].from}</p>
+        </div>
+      </div>
+    </div>
+
+    <a class="hero-scroll" href="#down" data-scroll="down">
+      <span>向下滚动</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 5v14M6 13l6 6 6-6"></path>
+      </svg>
+    </a>
+
+    <div class="hero-wave" aria-hidden="true">
+      <svg viewBox="0 0 1440 120" preserveAspectRatio="none">
+        <path d="M0,50 C240,90 480,10 720,50 C960,90 1200,10 1440,50 L1440,120 L0,120 Z" fill="#ffffff"></path>
+      </svg>
+    </div>
+
+    <script type="application/json" id="quotes-data" set:html={JSON.stringify(quotes)} />
+    <script type="application/json" id="phrases-data" set:html={JSON.stringify(typePhrases)} />
+    <script>
+      // 打字机：轮播几句，打出来再删，再换下一句
+      const typedEl = document.getElementById('typed');
+      if (typedEl) {
+        const phrases = JSON.parse(document.getElementById('phrases-data').textContent || '[]');
+        if (phrases.length) {
+          const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          let pi = 0, ci = 0, deleting = false;
+          function tick() {
+            const cur = phrases[pi];
+            if (!deleting) {
+              ci++;
+              typedEl.textContent = cur.slice(0, ci);
+              if (ci >= cur.length) {
+                deleting = true;
+                return setTimeout(tick, 1800);
+              }
+              return setTimeout(tick, reduced ? 0 : 130);
+            } else {
+              ci--;
+              typedEl.textContent = cur.slice(0, ci);
+              if (ci <= 0) {
+                deleting = false;
+                pi = (pi + 1) % phrases.length;
+                return setTimeout(tick, 320);
+              }
+              return setTimeout(tick, reduced ? 0 : 60);
+            }
+          }
+          if (reduced) {
+            typedEl.textContent = phrases[0];
+          } else {
+            tick();
+          }
+        }
+      }
+
+      // 格言刷新
+      const qBtn = document.querySelector('.quote-refresh');
+      const qText = document.getElementById('quote-text');
+      const qFrom = document.getElementById('quote-from');
+      if (qBtn && qText && qFrom) {
+        const list = JSON.parse(document.getElementById('quotes-data').textContent || '[]');
+        let qi = 0;
+        qBtn.addEventListener('click', () => {
+          if (!list.length) return;
+          qi = (qi + 1) % list.length;
+          qBtn.classList.add('is-spin');
+          qText.style.opacity = '0';
+          qFrom.style.opacity = '0';
+          setTimeout(() => {
+            qText.textContent = list[qi].text;
+            qFrom.textContent = '—— ' + list[qi].from;
+            qText.style.opacity = '1';
+            qFrom.style.opacity = '1';
+            qBtn.classList.remove('is-spin');
+          }, 220);
+        });
+      }
+
+      // 雨滴：生成一屏细密的雨线
+      const rainBox = document.querySelector('.hero-rain');
+      if (rainBox) {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reduced) {
+          const N = 46;
+          for (let i = 0; i < N; i++) {
+            const d = document.createElement('i');
+            d.style.left = (Math.random() * 100) + '%';
+            d.style.height = (40 + Math.random() * 70) + 'px';
+            d.style.animationDuration = (0.9 + Math.random() * 1.1) + 's';
+            d.style.animationDelay = (Math.random() * 2) + 's';
+            d.style.opacity = (0.15 + Math.random() * 0.35).toFixed(2);
+            rainBox.appendChild(d);
+          }
+        }
+      }
+    </script>
+  </section>
+
+  <div class="wrap" id="down">
+    <a class="search-band" href={link('/search/')} data-search-entry>
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <circle cx="11" cy="11" r="6.5"></circle>
+        <path d="M16 16l4 4"></path>
+      </svg>
+      <span>搜文章、随记、小说里的句子</span>
+      <kbd>/</kbd>
+    </a>
+  </div>
+
+  <div class="wrap home-cards">
+    <article class="hcard pf">
+      <div class="pf-head">
+        <div class="pf-face" aria-hidden="true">
+          <img src={`${import.meta.env.BASE_URL}/avatar.png`} alt="忘忧居头像" />
+        </div>
+        <div class="pf-id">
+          <h2>{site.name}</h2>
+          <span class="pf-en">{site.en}</span>
+          <p class="pf-one">{site.intro}</p>
+        </div>
+      </div>
+
+      <div class="pf-bio">
+        {site.bio.map((line) => <p>{line}</p>)}
+      </div>
+
+      <div class="pf-foot">
+        <a class="pf-num" href={link('/writing/')}>
+          <b>{posts.length}</b><span>文章</span>
+        </a>
+        <a class="pf-num" href={link('/notes/')}>
+          <b>{notes.length}</b><span>随记</span>
+        </a>
+        <a class="pf-num" href={link('/gallery/')}>
+          <b>{photos.length}</b><span>照片</span>
+        </a>
+
+        <div class="pf-icons">
+          {
+            ghUrl ? (
+              <a class="pf-icon-btn" href={ghUrl} target="_blank" rel="noopener" title={`GitHub ${ghLabel}`}>
+                <svg class="gh-mark" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                  <path
+                    d="M12 1C5.923 1 1 5.923 1 12c0 4.867 3.149 8.979 7.521 10.436c.55.096.756-.233.756-.522c0-.262-.013-1.128-.013-2.049c-2.764.509-3.479-.674-3.699-1.292c-.124-.317-.66-1.293-1.127-1.554c-.385-.207-.936-.715-.014-.729c.866-.014 1.485.797 1.691 1.128c.99 1.663 2.571 1.196 3.204.907c.096-.715.385-1.196.701-1.471c-2.448-.275-5.005-1.224-5.005-5.432c0-1.196.426-2.186 1.128-2.956c-.111-.275-.496-1.402.11-2.915c0 0 .921-.288 3.024 1.128a10.2 10.2 0 0 1 2.75-.371c.936 0 1.871.123 2.75.371c2.104-1.43 3.025-1.128 3.025-1.128c.605 1.513.221 2.64.111 2.915c.701.77 1.127 1.747 1.127 2.956c0 4.222-2.571 5.157-5.019 5.432c.399.344.743 1.004.743 2.035c0 1.471-.014 2.654-.014 3.025c0 .289.206.632.756.522C19.851 20.979 23 16.854 23 12c0-6.077-4.922-11-11-11"
+                  ></path>
+                </svg>
+                <span class="sr">GitHub</span>
+              </a>
+            ) : (
+              <button
+                class="pf-icon-btn is-todo"
+                type="button"
+                data-todo="GitHub 还没填：在后台「站点」页填 contact.github"
+                title="GitHub 待接入"
+              >
+                <svg class="gh-mark" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                  <path
+                    d="M12 1C5.923 1 1 5.923 1 12c0 4.867 3.149 8.979 7.521 10.436c.55.096.756-.233.756-.522c0-.262-.013-1.128-.013-2.049c-2.764.509-3.479-.674-3.699-1.292c-.124-.317-.66-1.293-1.127-1.554c-.385-.207-.936-.715-.014-.729c.866-.014 1.485.797 1.691 1.128c.99 1.663 2.571 1.196 3.204.907c.096-.715.385-1.196.701-1.471c-2.448-.275-5.005-1.224-5.005-5.432c0-1.196.426-2.186 1.128-2.956c-.111-.275-.496-1.402.11-2.915c0 0 .921-.288 3.024 1.128a10.2 10.2 0 0 1 2.75-.371c.936 0 1.871.123 2.75.371c2.104-1.43 3.025-1.128 3.025-1.128c.605 1.513.221 2.64.111 2.915c.701.77 1.127 1.747 1.127 2.956c0 4.222-2.571 5.157-5.019 5.432c.399.344.743 1.004.743 2.035c0 1.471-.014 2.654-.014 3.025c0 .289.206.632.756.522C19.851 20.979 23 16.854 23 12c0-6.077-4.922-11-11-11"
+                  ></path>
+                </svg>
+                <span class="sr">GitHub</span>
+              </button>
+            )
+          }
+          {
+            c.email ? (
+              <a class="pf-icon-btn" href={`mailto:${c.email}`} title={`写信：${c.email}`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <rect x="3.5" y="6" width="17" height="12" rx="2"></rect>
+                  <path d="M4.5 8l7.5 5.2 7.5-5.2"></path>
+                </svg>
+                <span class="sr">邮箱</span>
+              </a>
+            ) : (
+              <button
+                class="pf-icon-btn is-todo"
+                type="button"
+                data-todo="邮箱还没填：在后台「站点」页填 contact.email"
+                title="邮箱待接入"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <rect x="3.5" y="6" width="17" height="12" rx="2"></rect>
+                  <path d="M4.5 8l7.5 5.2 7.5-5.2"></path>
+                </svg>
+                <span class="sr">邮箱</span>
+              </button>
+            )
+          }
+          {
+            c.wechatId ? (
+              <button class="pf-icon-btn" type="button" data-copy={c.wechatId} title={`复制微信：${c.wechatId}`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <path d="M5.5 5h10a3 3 0 0 1 3 3v4.5a3 3 0 0 1-3 3H10l-4.5 3.5V15.5h-.5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z"></path>
+                </svg>
+                <span class="sr">微信</span>
+              </button>
+            ) : (
+              <button
+                class="pf-icon-btn is-todo"
+                type="button"
+                data-todo="微信号还没填：在后台「站点」页填 contact.wechatId；二维码图放 public/ 后填 contact.wechatQr"
+                title="微信待接入"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <path d="M5.5 5h10a3 3 0 0 1 3 3v4.5a3 3 0 0 1-3 3H10l-4.5 3.5V15.5h-.5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z"></path>
+                </svg>
+                <span class="sr">微信</span>
+              </button>
+            )
+          }
+          {
+            dyUrl ? (
+              <a class="pf-icon-btn" href={dyUrl} target="_blank" rel="noopener" title={`抖音 ${dyLabel}`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <path d="M14 4v9.5a3.4 3.4 0 1 1-3.4-3.4"></path>
+                  <path d="M14 4c.5 2.4 2.2 3.9 4 4.2"></path>
+                </svg>
+                <span class="sr">抖音</span>
+              </a>
+            ) : (
+              <button
+                class="pf-icon-btn is-todo"
+                type="button"
+                data-todo="抖音还没填：在后台「站点」页填 contact.douyin"
+                title="抖音待接入"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <path d="M14 4v9.5a3.4 3.4 0 1 1-3.4-3.4"></path>
+                  <path d="M14 4c.5 2.4 2.2 3.9 4 4.2"></path>
+                </svg>
+                <span class="sr">抖音</span>
+              </button>
+            )
+          }
+        </div>
+      </div>
+
+      {
+        c.wechatQr ? (
+          <a class="pf-qr" href={c.wechatQr} target="_blank" rel="noopener">
+            <img src={c.wechatQr} alt="微信二维码" width="104" height="104" loading="lazy" />
+            <span>微信二维码 · 点开放大</span>
+          </a>
+        ) : null
+      }
+    </article>
+
+    <div class="hcard mu" data-mu>
+      <div class="mu-top">
+        <span>NOW PLAYING</span>
+        <span>歌单 · {tracks.length} 首</span>
+      </div>
+
+      <a class="mu-body mu-hit" href={link('/music/')} aria-label={`去音乐页，现在在听《${tracks[cur].name}》`}>
+        <span class="mu-disc" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M15 5v9.2a3.2 3.2 0 1 1-3.2-3.2"></path>
+            <path d="M15 5c.5 2.2 2 3.5 3.6 3.8"></path>
+          </svg>
+        </span>
+        <span class="mu-txt">
+          <b data-mu="name">{tracks[cur].name}</b>
+          <span data-mu="artist">{tracks[cur].artist}</span>
+          <i class="mu-clip" data-mu="clip" hidden title="公共接口没登录态，这首只放得出试听">试听</i>
+        </span>
+      </a>
+
+      <span class="mu-why" data-mu="why">{tracks[cur].why}</span>
+
+      <div class="mu-go">
+        <button class="mu-btn" type="button" data-mu="prev" aria-label="上一首">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M7 6v12M18 6l-8 6 8 6z"></path>
+          </svg>
+        </button>
+        <button
+          class="mu-btn mu-btn-play"
+          type="button"
+          data-mu="toggle"
+          aria-label="播放"
+          aria-pressed="false"
+        >
+          <svg class="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M8 6l9 6-9 6z"></path>
+          </svg>
+          <svg class="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M9 6v12M15 6v12"></path>
+          </svg>
+        </button>
+        <button class="mu-btn" type="button" data-mu="next" aria-label="下一首">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M17 6v12M6 6l8 6-8 6z"></path>
+          </svg>
+        </button>
+        <span class="mu-track" aria-hidden="true"><i data-mu="bar"></i></span>
+      </div>
+    </div>
+
+    <script type="application/json" id="mu-tracks" set:html={JSON.stringify({ api: site.musicApi, server: site.musicServer, playlistId: site.playlistId, fallbackTracks: tracks })} />
+    <script>
+      import { createDeck } from '../scripts/sound';
+
+      const card = document.querySelector('[data-mu]');
+      const data = document.getElementById('mu-tracks');
+      if (card && data) {
+        const { api, server, playlistId, fallbackTracks } = JSON.parse(data.textContent);
+
+        // 先显示加载中
+        const pick = (key) => card.querySelector(`[data-mu="${key}"]`);
+        pick('name').textContent = '加载中...';
+        pick('artist').textContent = '';
+
+        // 从歌单接口动态拉取歌曲列表
+        const playlistUrl = `${api}${api.includes('?') ? '&' : '?'}server=${server}&type=playlist&id=${playlistId}`;
+        fetch(playlistUrl)
+          .then((r) => r.json())
+          .then((playlist) => {
+            // 把 Meting 返回的格式转换成播放器需要的格式
+            const tracks = playlist.map((song, i) => {
+              // 从 url 里提取歌曲 id
+              const idMatch = song.url && song.url.match(/id=([^&]+)/);
+              return {
+                id: idMatch ? idMatch[1] : `song-${i}`,
+                name: song.name || '未知歌曲',
+                artist: song.artist || '未知艺术家',
+                dur: 300, // 默认 5 分钟
+                why: 'QQ 歌单',
+              };
+            });
+            if (!tracks.length) throw new Error('歌单为空');
+            return tracks;
+          })
+          .then((tracks) => {
+            const deck = createDeck(tracks, api, server);
+
+            deck.on('track', ({ index, track }) => {
+              pick('name').textContent = track.name;
+              pick('artist').textContent = track.artist;
+              pick('why').textContent = track.why;
+              pick('bar').style.width = '0%';
+              pick('clip').hidden = true;
+              card.querySelector('.mu-hit').setAttribute('aria-label', `去音乐页，现在在听《${track.name}》`);
+              // 同步底部歌词条
+              const lyricTxt = document.querySelector('.lyric .txt');
+              if (lyricTxt) lyricTxt.textContent = `今天循环：${track.name} —— ${track.why}`;
+            });
+
+            deck.on('state', (state) => {
+              const playing = state === 'playing';
+              card.classList.toggle('is-playing', playing);
+              card.classList.toggle('is-loading', state === 'loading');
+              const btn = pick('toggle');
+              btn.setAttribute('aria-pressed', String(playing));
+              btn.setAttribute('aria-label', playing ? '暂停' : '播放');
+              if (state === 'error') pick('why').textContent = '这首的音频没拿到，点进音乐页再看看';
+            });
+
+            deck.on('time', ({ ratio, short }) => {
+              pick('bar').style.width = `${Math.round(ratio * 1000) / 10}%`;
+              pick('clip').hidden = !short;
+            });
+
+            pick('prev').addEventListener('click', () => deck.prev());
+            pick('next').addEventListener('click', () => deck.next());
+            pick('toggle').addEventListener('click', () => deck.toggle());
+            deck.init();
+          })
+          .catch((err) => {
+            pick('name').textContent = '加载失败';
+            pick('artist').textContent = 'QQ 歌单加载出错了';
+            pick('why').textContent = String(err);
+          });
+      }
+    </script>
+
+  <div class="lyric">
+    <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    <span class="txt">今天循环：加载中...</span>
+  </div>
+
+  <section class="wall-sec">
+    <div class="wrap">
+      <div class="wall-head">
+        <span>最新</span>
+        <a class="sec-link" href={link('/archive/')}>
+          翻归档
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M5 12h13M13 6l6 6-6 6"></path>
+          </svg>
+        </a>
+      </div>
+
+      <div class="wall">
+        {
+          latest ? (
+            <a class="wc wc-big" href={link(`/writing/${latest.id}/`)}>
+              <span class={`wc-cover hue-${['mag', 'vio', 'cyan', 'amber'][posts.findIndex((p) => p.id === latest.id) % 4]}`}>
+                <em>{latest.data.tag}</em>
+              </span>
+              <span class="wc-meta">
+                <span>{latest.data.tag}</span>
+                <span>{fmt(latest.data.date)}</span>
+                <span>{latest.data.readTime}</span>
+              </span>
+              <span class="wc-title">{latest.data.title}</span>
+              <span class="wc-sum">{latest.data.summary}</span>
+            </a>
+          ) : null
+        }
+
+        {
+          rest.map((post, i) => (
+            <a class="wc" href={link(`/writing/${post.id}/`)}>
+              <span class="wc-meta">
+                <span>{post.data.tag}</span>
+                <span>{fmt(post.data.date)}</span>
+              </span>
+              <span class="wc-title">{post.data.title}</span>
+              <span class="wc-sum">{post.data.summary}</span>
+            </a>
+          ))
+        }
+
+        {
+          latestNotes.length ? (
+            <a class="wc wc-notes" href={link('/notes/')}>
+              <span class="wc-meta">
+                <span>随记</span>
+                <span>{notes.length} 条</span>
+              </span>
+              <ul>
+                {latestNotes.slice(0, 3).map((n) => (
+                  <li>
+                    <time>{fmt(n.data.date)}</time>
+                    <span>{trim((n.body ?? '').trim().split('\n')[0])}</span>
+                  </li>
+                ))}
+              </ul>
+            </a>
+          ) : null
+        }
+
+        <a class="wc wc-gallery" href={link('/gallery/')}>
+          <span class="wc-meta">
+            <span>相册</span>
+            <span>{photos.length} 张</span>
+          </span>
+          <span class="wc-thumbs">
+            {
+              photos.length ? (
+                photos.slice(0, 3).map((p) => <img src={p.src} alt={p.caption} loading="lazy" />)
+              ) : (
+                <img src={`${import.meta.env.BASE_URL}/hero-bg.jpg`} alt="山景占位" loading="lazy" />
+              )
+            }
+          </span>
+          <span class="wc-sum">{photos.length ? '最近放进去的几张' : '相册还空着，等第一张图'}</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head rise">
+        <h2><em>NOW</em>现在在做</h2>
+        <a class="sec-link" href={link('/doing/')}>
+          展开看
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M5 12h13M13 6l6 6-6 6"></path>
+          </svg>
+        </a>
+      </div>
+      <div class="doing-grid rise">
+        {
+          site.doing.map((d) => (
+            <article class="doing-card">
+              <span class="state">{d.state}</span>
+              <h3>{d.title}</h3>
+              <div class="sub">{d.sub}</div>
+              <p class="note">{d.note}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="wrap">
+      <div class="cta rise">
+        <div class="cta-in">
+          <h2>作品集</h2>
+          <p>视频、AIGC 实验、文案合集，都在那边。这里留下过程，那里放成品。</p>
+          <a
+            class="btn btn-primary"
+            href={hasPortfolio ? site.portfolioUrl : '#'}
+            data-ext="portfolio"
+            target={hasPortfolio ? '_blank' : undefined}
+            rel={hasPortfolio ? 'noopener' : undefined}
+          >
+            过去看看
+            <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M5 12h13M13 6l6 6-6 6"></path>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

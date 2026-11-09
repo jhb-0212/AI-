@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.astro/
+.shots/
+*.log
+.DS_Store
+Thumbs.db
+*.err
+
+# 后端：虚拟环境、数据库、签名密钥、渲染清单都不进仓库
+server/.venv/
+server/data/*.db
+server/data/*.db-journal
+server/data/*.db-wal
+server/data/.secret
+server/data/generated.json
+server/pytest.log
+server/uvicorn.log
+.venv/
+exit.txt
+server/data/build-history.json
