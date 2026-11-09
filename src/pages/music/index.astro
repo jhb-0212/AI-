@@ -83,28 +83,7 @@ const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/pl
         </div>
       </section>
 
-      <div class="mtabs" role="tablist" aria-label="音乐面板">
-        <button class="mtab is-on" type="button" role="tab" aria-selected="true" data-tab="lyr">
-          歌词
-        </button>
-        <button class="mtab" type="button" role="tab" aria-selected="false" data-tab="list">
-          曲目
-        </button>
-      </div>
-
-      <div class="mpanel is-on" data-panel="lyr" role="tabpanel">
-        <div class="lyr" data-deck="lyr">
-          <p class="lyr-credits" data-deck="credits"></p>
-          <div class="lyr-body" data-deck="body">
-            <p class="lyr-wait">在等这首歌的歌词。</p>
-          </div>
-        </div>
-        <p class="lyr-note">
-          歌词走 QQ 音乐的公开接口，版权在原作那边。听它的时候我写的一句：<span data-deck="why"></span>
-        </p>
-      </div>
-
-      <div class="mpanel" data-panel="list" role="tabpanel">
+      <div class="mpanel is-on" data-panel="list">
         <ul class="tracks" data-deck="list">
           <li><p class="lyr-wait">正在加载歌单...</p></li>
         </ul>

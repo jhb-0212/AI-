@@ -2,7 +2,8 @@
 网易云音乐代理接口
 带 cookie，能放完整歌曲，不会跳转
 """
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import PlainTextResponse
 import httpx
 import json
 
@@ -34,6 +35,7 @@ TENCENT_HEADERS = {
 
 @router.get("/")
 async def meting_compat(
+    request: Request,
     server: str = Query("netease"),
     type: str = Query(...),
     id: str = Query(...),
@@ -103,26 +105,41 @@ async def meting_compat(
                     mt_data = mt_res.json() if mt_res.text else {}
                     song_url = mt_data.get("url", "")
 
-                # 直接代理音频流，解决跨域问题
+                # 流式代理音频，边下边传，支持 Range 请求，分段加载更快
                 if song_url:
-                    audio_resp = await client.get(song_url)
+                    async def stream_audio():
+                        headers = {}
+                        range_header = request.headers.get("range")
+                        if range_header:
+                            headers["Range"] = range_header
+                        async with client.stream("GET", song_url, headers=headers) as resp:
+                            async for chunk in resp.aiter_bytes(chunk_size=8192):
+                                yield chunk
                     return StreamingResponse(
-                        audio_resp.iter_bytes(),
-                        status_code=audio_resp.status_code,
-                        media_type=audio_resp.headers.get("content-type", "audio/mpeg"),
+                        stream_audio(),
+                        media_type="audio/m4a",
                         headers={
                             "Accept-Ranges": "bytes",
+                            "Content-Disposition": "inline",
                         },
                     )
                 else:
                     return {"error": "没拿到播放地址", "url": ""}
 
             elif type == "lrc":
-                # 拿歌词：走 Meting
+                # 拿歌词：走 Meting，直接返回纯 LRC 文本
                 mt_res = await client.get(
                     f"{METING_API}?server={server}&type=lrc&id={id}"
                 )
-                return mt_res.json() if mt_res.text else {"lrc": {}}
+                if mt_res.text:
+                    mt_data = mt_res.json()
+                    # Meting 返回 { "lrc": "歌词文本..." }，提取出来直接返回
+                    lrc_text = mt_data.get("lrc", "")
+                    if isinstance(lrc_text, dict):
+                        lrc_text = lrc_text.get("lrc", "")
+                    return PlainTextResponse(lrc_text)
+                else:
+                    return PlainTextResponse("")
 
             elif type == "song":
                 # 拿歌曲详情：走 Meting
@@ -143,91 +160,3 @@ async def meting_compat(
 
         except Exception as e:
             return {"error": f"请求失败: {str(e)}", "url": ""}
-
-
-@router.get("/song")
-async def get_song(
-    id: int = Query(..., description="歌曲 ID"),
-):
-    """
-    获取歌曲播放地址
-    前端调用：/api/music/song?id=64638
-    返回：{ url: "https://...", name: "...", artist: "...", pic: "..." }
-    """
-    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-        try:
-            # 1. 先从 Meting 拿歌曲基本信息（名字、歌手、封面）
-            detail_res = await client.get(
-                f"{METING_API}?type=song&id={id}&server=netease"
-            )
-            detail = detail_res.json() if detail_res.text else []
-            song_info = detail[0] if detail else {}
-
-            # 2. 用网易云官方接口拿真实播放地址（带 cookie，完整歌曲）
-            url_res = await client.get(
-                f"https://music.163.com/api/song/enhance/player/url",
-                params={"ids": f"[{id}]", "br": "999000"},
-                headers=NETEASE_HEADERS,
-            )
-            url_data = url_res.json()
-            song_url = url_data.get("data", [{}])[0].get("url", "")
-
-            # 如果官方接口没拿到，回退到 Meting 的 url
-            if not song_url and song_info.get("url"):
-                song_url = song_info["url"]
-
-        except Exception as e:
-            return {"error": f"请求失败: {str(e)}", "url": ""}
-
-    return {
-        "url": song_url or "",
-        "name": song_info.get("name", ""),
-        "artist": song_info.get("artist", ""),
-        "pic": song_info.get("pic", ""),
-    }
-
-
-@router.get("/playlist")
-async def get_playlist(
-    id: int = Query(..., description="歌单 ID"),
-):
-    """
-    获取歌单所有歌曲
-    前端调用：/api/music/playlist?id=18570165544
-    """
-    async with httpx.AsyncClient(timeout=10) as client:
-        res = await client.get(
-            f"{METING_API}?type=playlist&id={id}&server=netease"
-        )
-        data = res.json()
-
-    return {
-        "songs": data,
-        "count": len(data),
-    }
-
-
-@router.get("/proxy")
-async def proxy_audio(
-    url: str = Query(..., description="要代理的音频地址"),
-):
-    """
-    音频代理接口，解决跨域问题
-    前端调用：/api/music/proxy?url=https://xxx.mp3
-    """
-    from fastapi.responses import StreamingResponse
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-        try:
-            req = client.build_request("GET", url)
-            resp = await client.send(req, stream=True)
-            return StreamingResponse(
-                resp.aiter_bytes(),
-                status_code=resp.status_code,
-                media_type=resp.headers.get("content-type", "audio/mpeg"),
-                headers={
-                    "Content-Disposition": "inline",
-                    "Accept-Ranges": "bytes",
-                },
-            )
-        except Exception as e:
-            return {"error": f"代理失败: {str(e)}"}

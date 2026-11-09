@@ -422,9 +422,6 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
               pick('bar').style.width = '0%';
               pick('clip').hidden = true;
               card.querySelector('.mu-hit').setAttribute('aria-label', `去音乐页，现在在听《${track.name}》`);
-              // 同步底部歌词条
-              const lyricTxt = document.querySelector('.lyric .txt');
-              if (lyricTxt) lyricTxt.textContent = `今天循环：${track.name} —— ${track.why}`;
             });
 
             deck.on('state', (state) => {
@@ -454,10 +451,6 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
           });
       }
     </script>
-
-  <div class="lyric">
-    <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-    <span class="txt">今天循环：加载中...</span>
   </div>
 
   <section class="wall-sec">
