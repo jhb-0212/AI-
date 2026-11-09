@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..config import GALLERY_DIR
 from ..db import get_db
+from ..imaging import sanitize_image
 from ..models import ContentVersion, Note, Post
 from ..schemas import NoteIn, NoteOut, PostIn, PostOut
 from ..security import current_user
@@ -191,7 +192,7 @@ def get_version(content_type: str, content_id: int, version_id: int, db: Session
 
 # ---------- 通用图片上传（文章插图用） ----------
 
-@router.post("/upload-image", status_code=201)
+@router.post("/upload-image", status_code=201, dependencies=[Depends(current_user)])
 async def upload_image(file: UploadFile = File(...)):
     """上传图片，返回可访问的 URL，供文章/随记 Markdown 插图用。"""
     suffix = "." + (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
@@ -211,6 +212,12 @@ async def upload_image(file: UploadFile = File(...)):
         suffix = ".jpg"
     elif real_type != ".jpg" and real_type != suffix:
         suffix = real_type
+
+    # 重编码 + 剥离 EXIF
+    try:
+        raw = sanitize_image(raw, suffix)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
 
     GALLERY_DIR.mkdir(parents=True, exist_ok=True)
     name = f"{uuid.uuid4().hex[:12]}{suffix}"

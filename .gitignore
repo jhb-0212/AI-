@@ -14,8 +14,13 @@ server/data/*.db-journal
 server/data/*.db-wal
 server/data/.secret
 server/data/generated.json
+server/data/backups/
 server/pytest.log
 server/uvicorn.log
 .venv/
 exit.txt
 server/data/build-history.json
+
+# 敏感配置：音乐 Cookie、密码等，绝不进 git
+.env
+server/.env

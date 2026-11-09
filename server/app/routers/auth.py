@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 import time
-from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
@@ -10,47 +9,67 @@ from sqlalchemy.orm import Session
 
 from ..config import ADMIN_PASSWORD, COOKIE_SECURE, TOKEN_COOKIE, TOKEN_TTL_MINUTES
 from ..db import get_db
-from ..models import AdminUser
+from ..models import AdminUser, LoginFailure
 from ..schemas import LoginIn, MeOut, PasswordChangeIn
 from ..security import create_token, current_user, hash_password, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# 登录限流：内存记录，失败 5 次锁 15 分钟
-_login_failures: dict[str, list[float]] = defaultdict(list)
+# 登录限流：失败记录落 SQLite（login_failures 表），多进程/重启后依然生效。
 MAX_FAILURES = 5
 LOCK_SECONDS = 15 * 60
 
 
-def _check_rate_limit(ip: str) -> None:
+def _check_rate_limit(db: Session, ip: str) -> None:
+    """锁定期内直接拒绝；否则把窗口内还在有效期内的失败时间戳刷新回库。"""
     now = time.time()
-    failures = [t for t in _login_failures.get(ip, []) if now - t < LOCK_SECONDS]
-    _login_failures[ip] = failures
-    if len(failures) >= MAX_FAILURES:
-        remaining = int(LOCK_SECONDS - (now - failures[0]))
+    row = db.get(LoginFailure, ip)
+    if row is None:
+        return
+    if row.lock_until > now:
+        remaining = int(row.lock_until - now)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"失败次数太多，请 {remaining // 60 + 1} 分钟后再试",
         )
+    # 窗口内（LOCK_SECONDS）的失败记录仍有效，其余丢弃
+    row.failures = [t for t in (row.failures or []) if now - t < LOCK_SECONDS]
+    if not row.failures:
+        db.delete(row)
+        db.commit()
 
 
-def _record_failure(ip: str) -> None:
-    _login_failures[ip].append(time.time())
+def _record_failure(db: Session, ip: str) -> None:
+    """记一次失败；满 MAX_FAILURES 则锁定 LOCK_SECONDS。"""
+    now = time.time()
+    row = db.get(LoginFailure, ip)
+    if row is None:
+        row = LoginFailure(ip=ip, failures=[], lock_until=0.0)
+        db.add(row)
+    row.failures = [t for t in (row.failures or []) if now - t < LOCK_SECONDS]
+    row.failures.append(now)
+    if len(row.failures) >= MAX_FAILURES:
+        row.lock_until = now + LOCK_SECONDS
+        row.failures = []  # 锁定后清空，避免解锁后立即再次触发
+    db.commit()
 
 
 @router.post("/login", response_model=MeOut)
 def login(payload: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else "unknown"
-    _check_rate_limit(ip)
+    _check_rate_limit(db, ip)
 
     user = db.scalar(select(AdminUser).where(AdminUser.username == payload.username))
     if not user or not verify_password(payload.password, user.password_hash):
-        _record_failure(ip)
+        _record_failure(db, ip)
         # 不区分「没这个用户」和「口令错了」，别让人拿登录接口试账号
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或口令不对")
 
-    # 登录成功，清空失败记录
-    _login_failures.pop(ip, None)
+    # 登录成功，清空该 IP 的失败记录
+    row = db.get(LoginFailure, ip)
+    if row is not None:
+        db.delete(row)
+        db.commit()
 
     token = create_token(user.username)
     response.set_cookie(
@@ -63,7 +82,7 @@ def login(payload: LoginIn, request: Request, response: Response, db: Session = 
         path="/",
     )
 
-    # 检测是否还是默认密码，返回标记
+    # 检测是否还在用「启动时设置的那个初始密码」，返回标记提示改密
     needs_password_change = verify_password(ADMIN_PASSWORD, user.password_hash)
     return MeOut(username=user.username, needs_password_change=needs_password_change)
 

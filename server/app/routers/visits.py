@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..config import ALLOWED_ORIGINS, ADMIN_PUBLIC_URL, PUBLIC_SITE_URL, SECRET_KEY
+from ..config import ALLOWED_ORIGINS, ADMIN_PUBLIC_URL, PUBLIC_SITE_URL, SECRET_KEY, TRUST_PROXY
 from ..db import get_db
 from ..models import Visit
 from ..security import current_user
@@ -140,9 +140,14 @@ async def hit(request: Request, db: Session = Depends(get_db)):
     if not isinstance(payload, dict):
         payload = {}
 
-    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
-        request.client.host if request.client else ""
-    )
+    # 只有在显式配置 TRUST_PROXY=1 时才信任反向代理传来的 XFF；
+    # 否则用连接对端 IP，防止伪造 XFF 绕过限流 / 污染 UV 统计。
+    if TRUST_PROXY:
+        ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
+            request.client.host if request.client else ""
+        )
+    else:
+        ip = request.client.host if request.client else ""
     ua = request.headers.get("user-agent", "")[:300]
 
     if _BOT.search(ua):

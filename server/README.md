@@ -44,7 +44,7 @@ python -m venv .venv
 | --- | --- | --- |
 | `DATABASE_URL` | `sqlite:///server/data/nepenthe.db` | 换 PostgreSQL 填 `postgresql+psycopg://user:pass@host/db` |
 | `ADMIN_USERNAME` | `admin` | 管理员账号 |
-| `ADMIN_PASSWORD` | `nepenthe-admin` | 管理员口令，**上线必改** |
+| `ADMIN_PASSWORD` | 无（必填） | 管理员口令，**必须显式设置**，未设置或仍为默认值会拒绝启动 |
 | `SECRET_KEY` | 自动生成到 `server/data/.secret` | JWT 签名密钥，多机部署要显式设成同一个 |
 | `TOKEN_TTL_MINUTES` | `720` | 登录有效期（12 小时） |
 | `BUILD_TIMEOUT` | `300` | 单次构建的秒数上限 |
@@ -53,6 +53,11 @@ python -m venv .venv
 | `ADMIN_PUBLIC_URL` | `http://127.0.0.1:8100` | 上线后的后台地址 |
 | `COOKIE_SECURE` | `0` | 走 HTTPS 时设 `1`，登录 cookie 只走加密连接 |
 | `ALLOWED_ORIGINS` | 空 | 前后端分域部署才需要，逗号分隔；同域留空 |
+| `TRUST_PROXY` | `0` | 是否信任反向代理的 `X-Forwarded-For`；只有后台确定只被可信 nginx 访问时才设 `1` |
+| `NETEASE_COOKIE` | 空 | 网易云音乐登录 Cookie，填了能放完整歌曲，不填只有 30–45 秒试听 |
+| `TENCENT_COOKIE` | 空 | QQ 音乐登录 Cookie，填了能放完整歌曲；不填只能放无版权限制歌曲的试听 |
+| `BACKUP_DIR` | 空 | 数据库备份的异地目录（挂载云盘/另一块盘），填了每天备份同时写一份过去 |
+| `BACKUP_REMOTE_KEEP_DAYS` | `30` | 异地备份保留天数（本地固定 7 天） |
 
 ## 目录
 
