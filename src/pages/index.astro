@@ -4,6 +4,7 @@ import { getCollection } from 'astro:content';
 import { site } from '../data/site';
 import { photos } from '../data/photos';
 import { link } from '../utils/url';
+import CardScene from '../components/CardScene.astro';
 
 const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
   (a, b) => b.data.date.getTime() - a.data.date.getTime()
@@ -44,6 +45,9 @@ const latest = posts[0];
 const rest = posts.slice(1, 3);
 const latestNotes = notes.slice(0, 3);
 const hasPortfolio = Boolean(site.portfolioUrl);
+
+// 卡片默认水墨山水底图；文章未填 cover 时回退到此图。
+const DEFAULT_SCENE = `${import.meta.env.BASE_URL}/hero-bg.jpg`;
 
 // 首屏格言卡：SSR 先渲染第一条，JS 负责点刷新换句
 const quotes = [
@@ -333,7 +337,7 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
         <span>歌单 · {tracks.length} 首</span>
       </div>
 
-      <a class="mu-body mu-hit" href={link('/music/')} aria-label={`去音乐页，现在在听《${tracks[cur].name}》`}>
+      <a class="mu-body mu-hit" href={link('/music/')} aria-label={`去音乐页，现在在听《${tracks[0].name}》`}>
         <span class="mu-disc" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <path d="M15 5v9.2a3.2 3.2 0 1 1-3.2-3.2"></path>
@@ -341,13 +345,13 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
           </svg>
         </span>
         <span class="mu-txt">
-          <b data-mu="name">{tracks[cur].name}</b>
-          <span data-mu="artist">{tracks[cur].artist}</span>
+          <b data-mu="name">{tracks[0].name}</b>
+          <span data-mu="artist">{tracks[0].artist}</span>
           <i class="mu-clip" data-mu="clip" hidden title="公共接口没登录态，这首只放得出试听">试听</i>
         </span>
       </a>
 
-      <span class="mu-why" data-mu="why">{tracks[cur].why}</span>
+      <span class="mu-why" data-mu="why">{tracks[0].why}</span>
 
       <div class="mu-go">
         <button class="mu-btn" type="button" data-mu="prev" aria-label="上一首">
@@ -378,42 +382,36 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
       </div>
     </div>
 
-    <script type="application/json" id="mu-tracks" set:html={JSON.stringify({ api: site.musicApi, server: site.musicServer, playlistId: site.playlistId, fallbackTracks: tracks })} />
+    <script type="application/json" id="mu-tracks" set:html={JSON.stringify({ api: site.musicApi, playlistId: site.playlistId, fallbackTracks: tracks })} />
     <script>
-      import { createDeck } from '../scripts/sound';
+      function bindHomeDeck() {
+        const { createDeck } = NepentheSound;
 
-      const card = document.querySelector('[data-mu]');
-      const data = document.getElementById('mu-tracks');
-      if (card && data) {
-        const { api, server, playlistId, fallbackTracks } = JSON.parse(data.textContent);
-
-        // 先显示加载中
+        const card = document.querySelector('[data-mu]');
+        const data = document.getElementById('mu-tracks');
+        if (card && data) {
+        const { api, playlistId, fallbackTracks } = JSON.parse(data.textContent);
         const pick = (key) => card.querySelector(`[data-mu="${key}"]`);
-        pick('name').textContent = '加载中...';
-        pick('artist').textContent = '';
 
-        // 从歌单接口动态拉取歌曲列表
-        const playlistUrl = `${api}${api.includes('?') ? '&' : '?'}server=${server}&type=playlist&id=${playlistId}`;
+        const playlistUrl = `${api}${api.includes('?') ? '&' : '?'}type=playlist&id=${playlistId}`;
         fetch(playlistUrl)
           .then((r) => r.json())
           .then((playlist) => {
-            // 把 Meting 返回的格式转换成播放器需要的格式
             const tracks = playlist.map((song, i) => {
-              // 从 url 里提取歌曲 id
               const idMatch = song.url && song.url.match(/id=([^&]+)/);
               return {
                 id: idMatch ? idMatch[1] : `song-${i}`,
                 name: song.name || '未知歌曲',
                 artist: song.artist || '未知艺术家',
-                dur: 300, // 默认 5 分钟
-                why: 'QQ 歌单',
+                dur: 300,
+                why: '网易云歌单',
               };
             });
             if (!tracks.length) throw new Error('歌单为空');
             return tracks;
           })
           .then((tracks) => {
-            const deck = createDeck(tracks, api, server);
+            const deck = createDeck(tracks, api);
 
             deck.on('track', ({ index, track }) => {
               pick('name').textContent = track.name;
@@ -446,10 +444,12 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
           })
           .catch((err) => {
             pick('name').textContent = '加载失败';
-            pick('artist').textContent = 'QQ 歌单加载出错了';
+            pick('artist').textContent = '网易云歌单加载出错了';
             pick('why').textContent = String(err);
           });
+        }
       }
+      document.addEventListener('astro:page-load', bindHomeDeck);
     </script>
   </div>
 
@@ -469,9 +469,7 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
         {
           latest ? (
             <a class="wc wc-big" href={link(`/writing/${latest.id}/`)}>
-              <span class={`wc-cover hue-${['mag', 'vio', 'cyan', 'amber'][posts.findIndex((p) => p.id === latest.id) % 4]}`}>
-                <em>{latest.data.tag}</em>
-              </span>
+              <CardScene src={latest.data.cover ?? DEFAULT_SCENE} alt={latest.data.title} />
               <span class="wc-meta">
                 <span>{latest.data.tag}</span>
                 <span>{fmt(latest.data.date)}</span>
@@ -484,8 +482,9 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
         }
 
         {
-          rest.map((post, i) => (
+          rest.map((post) => (
             <a class="wc" href={link(`/writing/${post.id}/`)}>
+              <CardScene src={post.data.cover ?? DEFAULT_SCENE} alt={post.data.title} />
               <span class="wc-meta">
                 <span>{post.data.tag}</span>
                 <span>{fmt(post.data.date)}</span>
@@ -499,6 +498,7 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
         {
           latestNotes.length ? (
             <a class="wc wc-notes" href={link('/notes/')}>
+              <CardScene src={DEFAULT_SCENE} alt="随记山水" />
               <span class="wc-meta">
                 <span>随记</span>
                 <span>{notes.length} 条</span>
@@ -516,6 +516,7 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
         }
 
         <a class="wc wc-gallery" href={link('/gallery/')}>
+          <CardScene src={DEFAULT_SCENE} alt="相册山水" />
           <span class="wc-meta">
             <span>相册</span>
             <span>{photos.length} 张</span>
@@ -550,6 +551,7 @@ const typePhrases = ['闲来无事，坐看云起', '这里允许有过程', '�
         {
           site.doing.map((d) => (
             <article class="doing-card">
+              <CardScene src={DEFAULT_SCENE} alt={d.title} />
               <span class="state">{d.state}</span>
               <h3>{d.title}</h3>
               <div class="sub">{d.sub}</div>

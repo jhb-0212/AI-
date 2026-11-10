@@ -48,6 +48,274 @@ const bgDim = typeof site.backgroundImageDim === 'number' ? site.backgroundImage
       href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@900&family=Noto+Sans+SC:wght@400&family=Noto+Sans+SC:wght@700&display=swap"
     />
     <script is:inline>document.documentElement.classList.add('js');</script>
+    <script is:inline>
+      // 站内播放器全局单例（经典内联脚本，固定网易云源，后端代理音频流）。
+      (function () {
+        'use strict';
+        var DEFAULT_API = 'https://api.injahow.cn/meting/';
+        var KEY = 'nepenthe:sound';
+        var CHANNEL = 'nepenthe-sound';
+        var GKEY = '__nepenthe_sound';
+
+        function fmt(sec) {
+          if (!Number.isFinite(sec) || sec <= 0) return '0:00';
+          var m = Math.floor(sec / 60);
+          var s = Math.floor(sec % 60);
+          return m + ':' + String(s).padStart(2, '0');
+        }
+
+        var CREDIT = /^(作词|作曲|编曲|制作人|监制|出品|录音|混音|母带|吉他|贝斯|键盘|鼓|和声|弦乐|原唱|翻唱|统筹|企划|词|曲)\s*[:：]/;
+        var LRC = /^\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\](.*)$/;
+
+        function parseLrc(text) {
+          var credits = [];
+          var lines = [];
+          String(text).split('\n').forEach(function (raw) {
+            var hit = LRC.exec(raw.trim());
+            if (!hit) return;
+            var m = Number(hit[1]);
+            var s = Number(hit[2]);
+            var ms = hit[3];
+            var t = m * 60 + s + (ms ? Number('0.' + '0'.repeat(3 - ms.length) + ms) : 0);
+            var body2 = hit[4].trim();
+            if (!body2) return;
+            if (CREDIT.test(body2)) {
+              if (credits.indexOf(body2) < 0) credits.push(body2);
+              return;
+            }
+            if (lines.some(function (l) { return l.t === t && l.text === body2; })) return;
+            lines.push({ t: t, text: body2 });
+          });
+          lines.sort(function (a, b) { return a.t - b.t; });
+          return { credits: credits, lines: lines };
+        }
+
+        function getG() {
+          if (!globalThis[GKEY]) {
+            globalThis[GKEY] = {
+              audio: null, tracks: [], index: 0, api: DEFAULT_API,
+              lyricsState: 'idle', lyrics: { credits: [], lines: [] }, current: -1,
+              notify: null, lastTime: 0, bound: false, channel: null,
+            };
+          }
+          return globalThis[GKEY];
+        }
+
+        var G = null;
+
+        function endpoint(type, id) {
+          return G.api + (G.api.indexOf('?') >= 0 ? '&' : '?') + 'type=' + type + '&id=' + id;
+        }
+        function persist() { try { localStorage.setItem(KEY, String(G.index)); } catch (e) {} }
+        function short(dur) {
+          var whole = G.tracks[G.index] && G.tracks[G.index].dur;
+          return Number.isFinite(dur) && dur > 0 && Number.isFinite(whole) && dur + 8 < whole;
+        }
+
+        function loadLyrics() {
+          var id = G.tracks[G.index] && G.tracks[G.index].id;
+          if (!id) return;
+          G.lyricsState = 'loading';
+          G.lyrics = { credits: [], lines: [] };
+          G.current = -1;
+          G.notify && G.notify('lyrics', { state: G.lyricsState, credits: [], lines: [] });
+          fetch(endpoint('lrc', id))
+            .then(function (r) { return r.ok ? r.text() : ''; })
+            .then(function (text) {
+              if (G.tracks[G.index] && G.tracks[G.index].id !== id) return;
+              var parsed = text ? parseLrc(text) : { credits: [], lines: [] };
+              G.lyrics = parsed;
+              G.lyricsState = parsed.lines.length ? 'ready' : 'none';
+              G.notify && G.notify('lyrics', { state: G.lyricsState, credits: parsed.credits, lines: parsed.lines });
+            })
+            .catch(function () {
+              if (G.tracks[G.index] && G.tracks[G.index].id !== id) return;
+              G.lyricsState = 'none';
+              G.notify && G.notify('lyrics', { state: G.lyricsState, credits: [], lines: [] });
+            });
+        }
+
+        function load(next, autoplay) {
+          if (!G.tracks.length) return;
+          G.index = ((next % G.tracks.length) + G.tracks.length) % G.tracks.length;
+          persist();
+          var t = G.tracks[G.index];
+          G.audio.src = endpoint('url', t.id);
+          G.current = -1;
+          loadLyrics();
+          G.notify && G.notify('track', { index: G.index, track: t });
+          if (autoplay) {
+            G.audio.play().catch(function () { G.notify && G.notify('state', 'error'); });
+          } else {
+            G.notify && G.notify('state', 'idle');
+          }
+        }
+
+        function bindGlobalAudio() {
+          if (G.bound || !G.audio) return;
+          G.bound = true;
+          var audio = G.audio;
+          audio.addEventListener('play', function () { G.notify && G.notify('state', 'playing'); });
+          audio.addEventListener('pause', function () { G.notify && G.notify('state', 'paused'); });
+          audio.addEventListener('waiting', function () { G.notify && G.notify('state', 'loading'); });
+          audio.addEventListener('playing', function () { G.notify && G.notify('state', 'playing'); });
+          audio.addEventListener('error', function () { G.notify && G.notify('state', 'error'); });
+          audio.addEventListener('loadedmetadata', function () {
+            G.notify && G.notify('time', { cur: audio.currentTime, dur: audio.duration, ratio: 0, short: short(audio.duration) });
+          });
+          audio.addEventListener('timeupdate', function () {
+            var dur = audio.duration;
+            G.notify && G.notify('time', {
+              cur: audio.currentTime, dur: dur,
+              ratio: Number.isFinite(dur) && dur > 0 ? audio.currentTime / dur : 0,
+              short: short(dur),
+            });
+            if (G.lyricsState === 'ready' && G.lyrics.lines.length) {
+              var hit = -1;
+              for (var i = 0; i < G.lyrics.lines.length; i += 1) {
+                if (G.lyrics.lines[i].t <= audio.currentTime + 0.15) hit = i;
+                else break;
+              }
+              if (hit !== G.current) { G.current = hit; G.notify && G.notify('line', hit); }
+            }
+          });
+          audio.addEventListener('ended', function () { load(G.index + 1, true); });
+        }
+
+        function createDeck(tracks, api) {
+          G = getG();
+          G.tracks = tracks || [];
+          G.api = api || DEFAULT_API;
+
+          if (!G.audio) {
+            G.audio = new Audio();
+            G.audio.preload = 'none';
+            G.audio.volume = 0.6;
+            bindGlobalAudio();
+          }
+
+          var freshSession = !G.audio;
+          if (!G.tracks.length) {
+            G.index = 0;
+          } else if (freshSession) {
+            try {
+              var saved = Number(localStorage.getItem(KEY));
+              if (Number.isInteger(saved) && saved >= 0 && saved < G.tracks.length) G.index = saved;
+            } catch (e) {}
+          }
+
+          var remote = false;
+          var subs = new Map();
+
+          function broadcast(type, data) {
+            if (!G.channel || remote) return;
+            if (type === 'time') {
+              var now = Date.now();
+              if (now - G.lastTime < 250) return;
+              G.lastTime = now;
+            }
+            try { G.channel.postMessage({ type: type, data: data }); } catch (e) {}
+          }
+          function emit(type, data) {
+            var set = subs.get(type);
+            if (set) set.forEach(function (fn) { fn(data); });
+            broadcast(type, data);
+          }
+          G.notify = emit;
+
+          function on(type, fn) {
+            if (!subs.has(type)) subs.set(type, new Set());
+            subs.get(type).add(fn);
+            return function () { subs.get(type).delete(fn); };
+          }
+
+          if (!G.channel) {
+            try { if ('BroadcastChannel' in globalThis) G.channel = new BroadcastChannel(CHANNEL); }
+            catch (e) { G.channel = null; }
+          }
+
+          function toggle() {
+            if (!G.audio.src) { load(G.index, true); return; }
+            if (G.audio.paused) G.audio.play().catch(function () { emit('state', 'error'); });
+            else G.audio.pause();
+          }
+          function next() { load(G.index + 1, true); }
+          function prev() { load(G.index - 1, true); }
+          function pick(i) { load(i, true); }
+          function seek(ratio) {
+            if (!G.audio.src) return;
+            var dur = G.audio.duration;
+            if (!Number.isFinite(dur) || dur <= 0) return;
+            G.audio.currentTime = Math.max(0, Math.min(dur - 0.2, dur * ratio));
+          }
+          function sendCmd(action, payload) {
+            if (!G.channel || remote) return;
+            try { G.channel.postMessage({ type: 'cmd', data: { action: action, payload: payload } }); } catch (e) {}
+          }
+
+          if (G.channel) {
+            G.channel.onmessage = function (ev) {
+              var msg = ev.data || {};
+              remote = true;
+              try {
+                if (msg.type === 'track') {
+                  var ri = msg.data && msg.data.index;
+                  var rt = msg.data && msg.data.track;
+                  if (Number.isInteger(ri) && ri >= 0 && ri < G.tracks.length) G.index = ri;
+                  emit('track', { index: G.index, track: rt || G.tracks[G.index] });
+                } else if (msg.type === 'state') {
+                  emit('state', msg.data);
+                } else if (msg.type === 'time') {
+                  emit('time', msg.data);
+                } else if (msg.type === 'cmd') {
+                  var action = msg.data && msg.data.action;
+                  var payload = msg.data && msg.data.payload;
+                  if (action === 'toggle') toggle();
+                  else if (action === 'next') next();
+                  else if (action === 'prev') prev();
+                  else if (action === 'pick') pick(payload);
+                  else if (action === 'seek') seek(payload);
+                }
+              } finally { remote = false; }
+            };
+          }
+
+          return {
+            audio: G.audio,
+            fmt: fmt,
+            get index() { return G.index; },
+            get track() { return G.tracks[G.index]; },
+            get state() { return G.audio.paused ? 'paused' : 'playing'; },
+            get lyricsState() { return G.lyricsState; },
+            get lyrics() { return G.lyrics; },
+            on: on,
+            init: function () {
+              emit('track', { index: G.index, track: G.tracks[G.index] });
+              var st = 'idle';
+              if (G.audio && G.audio.src) st = G.audio.paused ? 'paused' : 'playing';
+              emit('state', st);
+              if (G.audio && G.audio.src) {
+                emit('time', { cur: G.audio.currentTime, dur: G.audio.duration, ratio: Number.isFinite(G.audio.duration) && G.audio.duration > 0 ? G.audio.currentTime / G.audio.duration : 0, short: short(G.audio.duration) });
+              }
+              loadLyrics();
+            },
+            toggle: function () { toggle(); sendCmd('toggle'); },
+            next: function () { next(); sendCmd('next'); },
+            prev: function () { prev(); sendCmd('prev'); },
+            pick: function (i) { pick(i); sendCmd('pick', i); },
+            seek: function (ratio) { seek(ratio); sendCmd('seek', ratio); },
+            bump: function (seconds) {
+              if (!G.audio.src) return;
+              var dur = G.audio.duration;
+              if (!Number.isFinite(dur) || dur <= 0) return;
+              G.audio.currentTime = Math.max(0, Math.min(dur - 0.2, G.audio.currentTime + seconds));
+            },
+          };
+        }
+
+        globalThis.NepentheSound = { createDeck: createDeck, fmt: fmt };
+      })();
+    </script>
     <slot name="head" />
     <ViewTransitions />
   </head>

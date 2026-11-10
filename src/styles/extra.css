@@ -1738,42 +1738,37 @@
   line-height: 1.85;
   color: var(--dim);
 }
-.wc-cover {
+/* ===== 卡片统一山水封面 ===== */
+.card-scene {
   position: relative;
-  isolation: isolate;
-  display: grid;
-  place-items: center;
-  height: 126px;
+  display: block;
+  width: calc(100% + 4px);
+  height: 124px;
   margin: -2px -2px 15px;
-  border-radius: 11px;
   overflow: hidden;
+  border-radius: 12px;
 }
-.wc-cover::before {
-  content: "";
-  position: absolute;
-  inset: -34%;
-  opacity: 0.46;
-  filter: blur(20px);
+.card-scene__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.wc-cover::after {
-  content: "";
+.card-scene__veil {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgba(244, 240, 255, 0.09);
+  background: linear-gradient(180deg, rgba(31, 46, 42, 0.1), rgba(31, 46, 42, 0.34));
+  pointer-events: none;
 }
-.wc-cover em {
-  position: relative;
-  font-family: var(--serif);
-  font-style: normal;
-  font-weight: 900;
-  font-size: 14px;
-  letter-spacing: 0.18em;
-  color: rgba(244, 240, 255, 0.72);
+.wc .card-scene { height: 118px; }
+.wc-notes .card-scene { height: 110px; }
+.wc-gallery .card-scene { height: 118px; }
+.doing-card .card-scene {
+  height: 116px;
+  width: calc(100% + 44px);
+  margin: -22px -22px 14px;
 }
-.wc-big .wc-cover {
-  height: 148px;
-}
+.wc-big .card-scene { height: 150px; }
 .wc-big .wc-title {
   font-size: 21px;
 }

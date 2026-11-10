@@ -1,0 +1,12 @@
+---
+interface Props {
+  src: string;
+  alt?: string;
+}
+const { src, alt = '' } = Astro.props;
+---
+
+<div class="card-scene" aria-hidden="true">
+  <img class="card-scene__img" src={src} alt={alt} loading="lazy" decoding="async" />
+  <span class="card-scene__veil"></span>
+</div>

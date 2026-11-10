@@ -3,7 +3,7 @@ import Base from '../../layouts/Base.astro';
 import { site } from '../../data/site';
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/playlist.html?id=${site.playlistId}` : '';
+const listUrl = site.playlistId ? `https://music.163.com/#/playlist?id=${site.playlistId}` : '';
 ---
 
 <Base title="音乐" desc="最近在循环的东西。曲目会换，理由不会。">
@@ -11,7 +11,7 @@ const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/pl
     <div class="wrap">
       <div class="page-head">
         <h1><span class="kicker">SOUND</span>音乐</h1>
-        <p>最近在循环的东西。声音走 QQ 音乐的接口，点一下就能听。</p>
+        <p>最近在循环的东西。声音走网易云音乐的接口，点一下就能听。</p>
       </div>
 
       <section class="stage" data-deck>
@@ -77,7 +77,7 @@ const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/pl
               rel="noopener"
               data-deck="song"
             >
-              QQ 音乐 ↗
+              网易云音乐 ↗
             </a>
           </div>
         </div>
@@ -94,7 +94,7 @@ const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/pl
               <>
                 <br />
                 <a href={listUrl} target="_blank" rel="noopener">
-                  在 QQ 音乐打开歌单 ↗
+                  在网易云音乐打开歌单 ↗
                 </a>
               </>
             )
@@ -104,18 +104,19 @@ const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/pl
     </div>
   </div>
 
-  <script type="application/json" id="deck-tracks" set:html={JSON.stringify({ api: site.musicApi, server: site.musicServer, playlistId: site.playlistId })} />
+  <script type="application/json" id="deck-tracks" set:html={JSON.stringify({ api: site.musicApi, playlistId: site.playlistId })} />
   <script>
-    import { createDeck } from '../../scripts/sound';
+    function bindMusicDeck() {
+      const { createDeck } = NepentheSound;
 
-    const root = document.querySelector('[data-deck]');
-    const data = document.getElementById('deck-tracks');
-    if (root && data) {
-      const { api, server, playlistId } = JSON.parse(data.textContent);
+      const root = document.querySelector('[data-deck]');
+      const data = document.getElementById('deck-tracks');
+      if (root && data) {
+      const { api, playlistId } = JSON.parse(data.textContent);
       const pick = (key) => document.querySelector(`[data-deck="${key}"]`);
 
-      // 从歌单接口动态拉取歌曲列表
-      const playlistUrl = `${api}${api.includes('?') ? '&' : '?'}server=${server}&type=playlist&id=${playlistId}`;
+      // 从歌单接口动态拉取歌曲列表（固定网易云源）
+      const playlistUrl = `${api}${api.includes('?') ? '&' : '?'}type=playlist&id=${playlistId}`;
       fetch(playlistUrl)
         .then((r) => r.json())
         .then((playlist) => {
@@ -127,14 +128,14 @@ const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/pl
               name: song.name || '未知歌曲',
               artist: song.artist || '未知艺术家',
               dur: 300,
-              why: 'QQ 歌单',
+              why: '网易云歌单',
             };
           });
           if (!tracks.length) throw new Error('歌单为空');
           return tracks;
         })
         .then((tracks) => {
-          const deck = createDeck(tracks, api, server);
+          const deck = createDeck(tracks, api);
 
           // 更新总数
           pick('total').textContent = String(tracks.length).padStart(2, '0');
@@ -156,37 +157,17 @@ const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/pl
               </span>
               <span class="why">${t.why}</span>
             `;
-            btn.addEventListener('click', () => deck.load(i, true));
+            btn.addEventListener('click', () => deck.pick(i));
             li.appendChild(btn);
             listEl.appendChild(li);
           });
-
-          // 歌词面板：先把行铺好，再按播放时间换高亮那一行
-          let lineEls = [];
-          const paintLines = (lines) => {
-            const body = pick('body');
-            body.innerHTML = '';
-            lineEls = lines.map((line) => {
-              const p = document.createElement('p');
-              p.textContent = line.text;
-              body.appendChild(p);
-              return p;
-            });
-          };
-          const highlight = (i) => {
-            lineEls.forEach((el, n) => el.classList.toggle('is-on', n === i));
-            const el = lineEls[i];
-            if (!el) return;
-            const box = pick('lyr');
-            box.scrollTo({ top: el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2, behavior: 'smooth' });
-          };
 
           deck.on('track', ({ index, track }) => {
             pick('count').textContent = String(index + 1).padStart(2, '0');
             pick('name').textContent = track.name;
             pick('artist').textContent = track.artist;
             pick('why').textContent = track.why;
-            pick('song').href = `https://y.qq.com/n/ryqq/songDetail/${track.id}`;
+            pick('song').href = `https://music.163.com/#/song?id=${track.id}`;
             pick('cur').textContent = '0:00';
             pick('dur').textContent = '0:00';
             pick('fill').style.width = '0%';
@@ -196,74 +177,42 @@ const listUrl = site.playlistId ? `https://i2.y.qq.com/n3/other/pages/details/pl
               el.classList.toggle('is-on', on);
               el.setAttribute('aria-current', on ? 'true' : 'false');
             });
-            pick('credits').textContent = '';
-            paintLines([]);
-            pick('body').innerHTML = '<p class="lyr-wait">在等这首歌的歌词。</p>';
           });
-
-          deck.on('lyrics', ({ state, credits, lines }) => {
-            pick('credits').textContent = credits.length ? credits.join('　·　') : '';
-            if (state === 'ready') {
-              paintLines(lines);
-              highlight(-1);
-            } else if (state === 'none') {
-              pick('body').innerHTML = '<p class="lyr-wait">这首没拿到歌词，听就好。</p>';
-            } else if (state === 'loading') {
-              pick('body').innerHTML = '<p class="lyr-wait">在等这首歌的歌词。</p>';
-            } else {
-              pick('body').innerHTML = '';
-            }
-          });
-
-          deck.on('line', (i) => highlight(i));
 
           deck.on('state', (state) => {
             const playing = state === 'playing';
             root.classList.toggle('is-playing', playing);
             root.classList.toggle('is-loading', state === 'loading');
-        const btn = pick('toggle');
-        btn.setAttribute('aria-pressed', String(playing));
-        btn.setAttribute('aria-label', playing ? '暂停' : '播放');
-        if (state === 'error') pick('why').textContent = '这首的音频没拿到，点上面链接去 QQ 音乐听';
-      });
+            const btn = pick('toggle');
+            btn.setAttribute('aria-pressed', String(playing));
+            btn.setAttribute('aria-label', playing ? '暂停' : '播放');
+            if (state === 'error') pick('why').textContent = '这首的音频没拿到，点右上角链接去网易云听';
+          });
 
-      deck.on('time', ({ cur, dur, ratio, short }) => {
-        pick('cur').textContent = deck.fmt(cur);
-        pick('dur').textContent = deck.fmt(dur);
-        pick('fill').style.width = `${ratio * 100}%`;
-        pick('clip').hidden = !short;
-      });
+          deck.on('time', ({ cur, dur, ratio, short }) => {
+            pick('cur').textContent = deck.fmt(cur);
+            pick('dur').textContent = deck.fmt(dur);
+            pick('fill').style.width = `${ratio * 100}%`;
+            pick('clip').hidden = !short;
+          });
 
-      pick('prev').addEventListener('click', () => deck.prev());
-      pick('next').addEventListener('click', () => deck.next());
+          pick('prev').addEventListener('click', () => deck.prev());
+          pick('next').addEventListener('click', () => deck.next());
           pick('toggle').addEventListener('click', () => deck.toggle());
           pick('bar').addEventListener('click', (event) => {
             const rect = event.currentTarget.getBoundingClientRect();
             deck.seek((event.clientX - rect.left) / rect.width);
           });
 
-          // tabs
-          document.querySelectorAll('.mtab[data-tab]').forEach((tab) => {
-            tab.addEventListener('click', () => {
-              const key = tab.dataset.tab;
-              document.querySelectorAll('.mtab').forEach((el) => {
-                const on = el === tab;
-                el.classList.toggle('is-on', on);
-                el.setAttribute('aria-selected', on ? 'true' : 'false');
-              });
-              document.querySelectorAll('.mpanel').forEach((el) => {
-                el.classList.toggle('is-on', el.dataset.panel === key);
-              });
-            });
-          });
-
           deck.init();
         })
         .catch((err) => {
           pick('name').textContent = '加载失败';
-          pick('artist').textContent = 'QQ 歌单加载出错了';
+          pick('artist').textContent = '网易云歌单加载出错了';
           pick('why').textContent = String(err);
         });
+      }
     }
+    document.addEventListener('astro:page-load', bindMusicDeck);
   </script>
 </Base>
